@@ -102,6 +102,8 @@ scrape_configs:
       - targets: ["node-exporter:9100"]
 ```
 
+> **Field by field:** `scrape_interval: 15s` — how often Prometheus pulls each target · `job_name` — becomes the `job` label on every series collected, your primary who-is-this dimension · `static_configs.targets` — host:port list to scrape (`http://api:8000/metrics` implied; the hostnames are Compose service names because the whole lab stack shares a network — ch 06). In Kubernetes this static list is replaced by *service discovery*, but the scrape model is identical. Verify targets under the Prometheus UI's **Status → Targets** page: every row should say `UP`, and a `DOWN` row shows the exact scrape error.
+
 ### PromQL — the queries that matter
 
 ```promql
@@ -121,6 +123,13 @@ sum(rate(app_requests_total[5m])) by (path)
 # gauge, right now:
 node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes
 ```
+
+> **Query by query** (type these into Prometheus's web UI, the *Graph* tab — or later into Grafana panels; PromQL is the same everywhere):
+> - `rate(app_requests_total[5m])` — `[5m]` selects each series' last 5 minutes of samples (a *range*); `rate()` computes the per-second increase over that window, automatically handling counter resets on restarts. Result: one req/s value **per label combination** — every path/status pair separately.
+> - The error ratio — dissect it inside-out: `app_requests_total{status=~"5.."}` filters series by label, `=~` meaning regex-match (`5..` = 500–599); `rate(...[5m])` turns both numerator and denominator into per-second rates; `sum(...)` collapses the label combinations into single totals; the division yields a 0–1 fraction. Expect `0.021` = 2.1% of requests failing.
+> - `histogram_quantile(0.99, sum(rate(app_request_seconds_bucket[5m])) by (le))` — histograms expose per-bucket counters (`_bucket` series, labeled `le=` "less than or equal"); `rate` + `sum by (le)` computes recent traffic per bucket while *keeping* the bucket label (that's what `by (le)` preserves — `histogram_quantile` needs it); the function then interpolates the 99th percentile. Read as: "the latency 99% of recent requests beat".
+> - `sum(...) by (path)` — aggregate but keep one dimension: one req/s number per path. `by` is PromQL's GROUP BY.
+> - The memory line — gauges need no `rate()`; dividing two gauges gives the available-memory fraction right now.
 
 The pattern to internalize: **counters are always wrapped in `rate()`** — the
 raw total is meaningless; the per-second rate is the signal. And prefer ratios
@@ -183,6 +192,12 @@ full text — cheap to run, queried with **LogQL** in the same Grafana:
 sum(rate({job="visits"} | json | level="error" [5m]))   # logs → metrics!
 ```
 
+> **LogQL, line by line** (typed into Grafana's *Explore* view with Loki selected):
+> - `{job="visits"}` — the *stream selector*: which labeled log streams to read. Always required, always first — this is the indexed part, so tight selectors = fast queries.
+> - `|= "error"` — line filter: keep lines containing the substring (`!=` excludes; `|~` takes a regex). Exactly grep, running server-side over the selected streams.
+> - `| json` — parse each line as JSON, turning its fields into queryable labels; `| level="error"` then filters on a parsed field. Substring-match vs field-match is the structured-logging payoff from §5 made tangible: no more matching the word "error" inside a URL by accident.
+> - `sum(rate(... [5m]))` — PromQL-style functions over log streams: errors *per second*, graphable and alertable. You've turned logs into a metric without instrumenting anything — the trick for code you can't modify.
+
 Collection: **Promtail**/**Alloy** agent tails container stdout and ships to
 Loki (in K8s: a DaemonSet — one collector pod per node reads all pod logs).
 The heavyweight alternative you'll meet in enterprises: **ELK/EFK**
@@ -214,6 +229,8 @@ groups:
           summary: "Error ratio {{ $value | humanizePercentage }} on visits"
           runbook_url: "https://wiki/runbooks/visits-errors"
 ```
+
+> **Field by field:** `alert:` the name that shows up in pages · `expr:` any PromQL returning a value — the alert *fires* while the expression is true (here: §2's error-ratio query against a 2% threshold) · `for: 5m` — the condition must hold continuously for 5 minutes before firing; this single line kills the flapping alerts that a momentary blip would cause · `labels:` routing metadata — Alertmanager's rules match on `severity: page` to decide pager-vs-Slack · `annotations:` human-facing text; `{{ $value | humanizePercentage }}` templates the current expression value into the message (`Error ratio 3.4% on visits`), and `runbook_url` is the 3 a.m. lifeline discussed below. The file loads via `rule_files:` in `prometheus.yml`; check status under the UI's *Alerts* tab (green inactive / yellow pending — inside the `for` window / red firing).
 
 **Alertmanager** (routing layer): groups related alerts, routes by severity
 (page → PagerDuty/phone; warn → Slack), silences during maintenance, inhibits

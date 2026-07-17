@@ -26,6 +26,12 @@ docker volume ls
 docker volume inspect pgdata
 ```
 
+> **Command by command:**
+> - `docker volume create pgdata` — makes a named, Docker-managed storage area (it lives under `/var/lib/docker/volumes/`, but you never touch that path directly). Optional — `-v pgdata:...` auto-creates it — but explicit creation reads better in scripts.
+> - `-v pgdata:/var/lib/postgresql/data` — the mount syntax: `VOLUME_NAME:CONTAINER_PATH`. Postgres writes its entire database into that container path, so the mount redirects the data onto the volume. (The `-e POSTGRES_PASSWORD` is required by the postgres image on first run — it initializes the superuser.)
+> - `docker volume ls` / `inspect` — list volumes / show one's details (driver, creation time, mountpoint). Note what's *missing*: there is no size column — `docker system df -v` answers that.
+> **How to read the mount decision:** if the first character before `:` is a *path* (`~/site:/usr/...`), it's a bind mount; if it's a *name* (`pgdata:...`), it's a volume. Same flag, different behavior — the table below is the decision guide.
+
 Kill the container, run a new one with the same `-v pgdata:...` → data intact.
 Volumes live under Docker's control, survive container removal, and are the way
 to run stateful services (databases, registries, Jenkins in ch 08).
@@ -64,6 +70,11 @@ docker run -d --name api --network appnet -p 8000:8000 myapp:1.0.0
 # inside 'api', the database is reachable as hostname "db":
 docker exec api getent hosts db
 ```
+
+> **Command by command:**
+> - `docker network create appnet` — a new isolated network with Docker's DNS enabled. Containers attach via `--network appnet` at run time.
+> - The two `docker run`s — note what's asymmetric: `db` gets **no `-p`** (nothing outside needs Postgres), `api` publishes `8000` (humans need it). Inside the network, `api` reaches Postgres at `db:5432` — container name as hostname, real container port.
+> - `docker exec api getent hosts db` — proves the DNS claim: `getent hosts` performs a name lookup *inside* the `api` container. Expect `172.18.0.2  db`. When "api can't reach db", this is the first diagnostic: name resolves? then check same-network membership with `docker network inspect appnet`.
 
 Key mental model:
 
@@ -138,6 +149,19 @@ docker compose down           # stop + remove containers & network
 docker compose down -v        # ...and volumes (data!) — deliberate act
 ```
 
+> **Command by command** (all read `compose.yaml` from the current directory — run them where the file lives):
+> - `docker compose up -d` — create everything the file declares (network, volumes, containers), in dependency order, detached. Re-running after edits is safe: Compose diffs desired vs actual and recreates only what changed — declarative thinking you'll meet again in Terraform (ch 13) and Kubernetes (ch 11).
+> - `docker compose ps` / `logs -f api` / `exec api sh` — the ch 05 commands, scoped to this project's containers and addressed by *service* name instead of container name.
+> - `--build` — rebuild images for services with a `build:` key before starting. Without it, Compose reuses the existing image even though you changed the code — the classic "why isn't my change showing up".
+> - `down` — stop and remove containers and the network. Volumes survive (your data). `down -v` removes those too — the full factory reset; type it knowing that.
+> **Expect from `up -d`:**
+> ```
+> ✔ Network myapp_default    Created
+> ✔ Container myapp-db-1     Healthy
+> ✔ Container myapp-api-1    Started
+> ```
+> Note `db` reaching `Healthy` (its healthcheck passed) *before* `api` starts — that's `condition: service_healthy` doing its job.
+
 What Compose gives you for free: a dedicated network (services reach each other
 by service name), ordered startup with health conditions, one-command lifecycle,
 and a **committed, reviewable description of the dev environment** — "clone the
@@ -172,7 +196,7 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 go build -o /out/server .
+RUN CGO_ENABLED=0 go build -o /out/server .    # static binary (no C deps) → runs on distroless
 
 # ---- final stage ----
 FROM gcr.io/distroless/static-debian12
@@ -180,6 +204,8 @@ COPY --from=build /out/server /server
 USER nonroot
 ENTRYPOINT ["/server"]
 ```
+
+> **The mechanics:** `FROM ... AS build` names a stage; a later `COPY --from=build src dst` reaches back into it. **Only the final stage becomes the shipped image** — everything in earlier stages (compiler, source code, caches) is simply left behind. `gcr.io/distroless/static-debian12` is a Google-maintained base containing only libc-level essentials: no shell, no `apt`, no busybox — which is why `docker exec ... sh` won't work on it, and why its attack surface is so small.
 
 Result: ~1 GB build environment → ~10 MB final image with *no shell, no package
 manager, nothing to exploit*.
@@ -224,6 +250,8 @@ Check your work: `docker images`, `docker history <img>`, and the excellent
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD curl -sf http://localhost:8000/health || exit 1
 ```
+
+> **How it works:** Docker runs the `CMD` *inside* the container on a schedule; exit 0 = healthy, non-zero = one strike. The knobs: `--interval` how often · `--timeout` how long the command may take · `--start-period` grace time after start during which failures don't count (app still booting) · `--retries` consecutive failures before the status flips to `unhealthy`. The `curl -sf` is ch 04's script-friendly health probe — `-f` turns an HTTP 500 into a non-zero exit; `|| exit 1` normalizes any failure to exit code 1 (Docker treats other codes as reserved). Requires curl to exist in the image — slim images often use `wget -q --spider` or a tiny built-in healthcheck binary instead.
 
 `docker ps` then shows `healthy`/`unhealthy`; Compose `depends_on` conditions and
 orchestrators key off it. (In Kubernetes you'll define probes in the pod spec
@@ -275,6 +303,19 @@ docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
 # or install natively: sudo apt install trivy (via aquasecurity repo)
 trivy image --severity HIGH,CRITICAL --exit-code 1 myapp:1.0.0
 ```
+
+> **Tool:** `trivy` (by Aqua Security) — scans an image's packages against CVE (known-vulnerability) databases. The first form runs Trivy itself as a container; mounting `docker.sock` lets it inspect your local images (with the security caveat that mounting the socket grants daemon control — fine for a scan on your own machine).
+> **Flags:** `image` scan an image (also: `fs` a directory, `config` IaC files — ch 16) · `--severity HIGH,CRITICAL` report only these levels — an unfiltered scan of any real base image yields hundreds of LOW findings and trains you to ignore the report · `--exit-code 1` exit non-zero when findings remain.
+> **Expect:**
+> ```
+> myapp:1.0.0 (debian 12.6)
+> Total: 2 (HIGH: 2, CRITICAL: 0)
+> ┌────────────┬────────────────┬──────────┬────────────┬───────────────┐
+> │  Library   │ Vulnerability  │ Severity │ Installed  │ Fixed Version │
+> ├────────────┼────────────────┼──────────┼────────────┼───────────────┤
+> │ libssl3    │ CVE-2026-xxxx  │ HIGH     │ 3.0.11-1   │ 3.0.13-1      │
+> ```
+> The *Fixed Version* column is the actionable part — usually the fix is just rebuilding on a newer base image.
 
 That `--exit-code 1` is the CI hook: scan fails → pipeline fails (ch 07).
 

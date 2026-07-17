@@ -51,6 +51,9 @@ Roughly 60–80 hours total. Suggested pace: 2 chapters per week ≈ 2 months.
 ## Conventions used throughout
 
 - `$` prefix means: run in a WSL2/bash shell. `PS>` means PowerShell.
+- Command examples are followed by a quoted **breakdown block** explaining the
+  tools being run, each flag, why the command is used there, and what output to
+  expect. Read the breakdown before running the command.
 - Long commands are broken with `\` line continuations — paste them whole.
 - Example app used across chapters: a small HTTP service (provided in chapter folders
   when needed) so you're always deploying *something real*.

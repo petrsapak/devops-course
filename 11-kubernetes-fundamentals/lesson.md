@@ -61,6 +61,14 @@ kubectl cluster-info
 kubectl get nodes
 ```
 
+> **Tools:** `kind` — runs a whole Kubernetes cluster where each "node" is a Docker container; `create cluster --name devops` boots one and writes its connection details into your kubeconfig. `kubectl` — *the* Kubernetes CLI; every command is an HTTPS call to the cluster's API server.
+> **The verification pair:** `kubectl cluster-info` prints the API server's URL — proving your kubeconfig points somewhere alive. `kubectl get nodes` asks the cluster for its member machines; expect:
+> ```
+> NAME                   STATUS   ROLES           AGE   VERSION
+> devops-control-plane   Ready    control-plane   2m    v1.30.0
+> ```
+> `STATUS Ready` is the health signal. Anything else (or a connection error) means stop and fix the cluster before continuing — every later command depends on this working.
+
 `kubectl` config lives in `~/.kube/config`; `kubectl config get-contexts` /
 `use-context` switches clusters — one CLI, many clusters.
 
@@ -103,6 +111,14 @@ kubectl logs visits -f --previous   # follow / previous crashed instance
 kubectl exec -it visits -- sh  # shell inside
 kubectl delete pod visits
 ```
+
+> **The kubectl grammar** — almost every command is `kubectl VERB RESOURCE-TYPE NAME [flags]`. Learn the verbs once, they apply to every object type:
+> - `apply -f pod.yaml` — "make reality match this file". Create or update, same command, safe to repeat (idempotent — ch 01's word, and the declarative discipline of §8).
+> - `get pods` — the list view. Expect: `NAME  READY  STATUS  RESTARTS  AGE` / `visits  1/1  Running  0  30s`. `-o wide` adds the pod's IP and node; `-o yaml` dumps the full object (including the `status:` the system added).
+> - `describe pod visits` — the detail view: config, conditions, and at the bottom **Events** — the scheduler's and kubelet's diary ("pulled image", "failed to pull", "OOMKilled"). Events answer most "why is my pod broken" questions; read them bottom-up (newest last).
+> - `logs visits` — the container's stdout (the ch 05 habit pays off here). `-f` follows; `--previous` shows the *last crashed* instance's output — the only place a boot-crash's error message survives.
+> - `exec -it visits -- sh` — a shell inside, exactly like `docker exec`; the `--` separates kubectl's flags from the command to run.
+> - `delete pod visits` — asks the API to remove it (SIGTERM → grace period → SIGKILL, same contract as `docker stop`).
 
 Every K8s object follows the same YAML skeleton: `apiVersion`, `kind`,
 `metadata` (name, labels), `spec` (desired state). The system adds `status`
@@ -147,6 +163,19 @@ kubectl delete pod <one-of-them>          # watch reconciliation replace it
 kubectl scale deploy visits --replicas=5  # imperative scale (or edit YAML + apply)
 ```
 
+> **What to watch:** `get deploy,rs,pods` (comma = multiple types in one call) shows the ownership chain — expect:
+> ```
+> NAME                          READY   UP-TO-DATE   AVAILABLE
+> deployment.apps/visits        3/3     3            3
+>
+> NAME                                    DESIRED   CURRENT   READY
+> replicaset.apps/visits-7d4b9c8f6d       3         3         3
+>
+> NAME                              READY   STATUS    RESTARTS
+> pod/visits-7d4b9c8f6d-x2m4p       1/1     Running   0
+> ```
+> The hash in the ReplicaSet name (`7d4b9c8f6d`) identifies one pod-template version; pod names append a random suffix to it. After `delete pod`, a replacement with a *new suffix* appears within seconds — you deleted a pod, but the ReplicaSet's job is "3 replicas exist", so it made another. That's reconciliation, observed.
+
 ### Rolling updates and rollback — ch 10, implemented
 
 ```bash
@@ -156,6 +185,12 @@ kubectl rollout status deploy/visits      # watch the roll
 kubectl rollout history deploy/visits
 kubectl rollout undo deploy/visits        # rollback in one command
 ```
+
+> **Command by command:**
+> - `set image deploy/visits app=...:1.1.0` — changes the image of container `app` in the pod template. Any template change (image, env, resources) triggers a rolling update: a new ReplicaSet is created and scaled up while the old scales down, wave by wave.
+> - `rollout status` — blocks until the roll completes (or fails), printing progress: `Waiting for deployment "visits" rollout to finish: 2 out of 3 new replicas have been updated...` Exit code reflects success — which makes this line the natural last step of a CI deploy job.
+> - `rollout history` — numbered revisions of the pod template (each old ReplicaSet is kept, scaled to 0, as the revision record).
+> - `rollout undo` — scales the previous revision's ReplicaSet back up — rollback as *another rolling update, backwards*, ch 10's rolling strategy both directions. `--to-revision=N` picks a specific one.
 
 The Deployment performs a **rolling update** by default (`maxSurge`/
 `maxUnavailable` tune the wave). Version coexistence during the roll — the ch 10
@@ -202,6 +237,11 @@ kubectl get endpoints visits-svc     # the actual pod IPs behind it — THE debu
 kubectl port-forward svc/visits-svc 8080:80   # tunnel to your laptop for testing
 ```
 
+> **Command by command:**
+> - `get svc` — expect `visits-svc  ClusterIP  10.96.142.7  <none>  80/TCP` — that `CLUSTER-IP` is the stable virtual IP; it never changes for the service's lifetime.
+> - `get endpoints visits-svc` — the pod IPs currently behind the service: `ENDPOINTS: 10.244.1.5:8000,10.244.1.6:8000,10.244.2.3:8000`. **The single most diagnostic command for service problems:** a healthy service lists ready pod IPs; `<none>` means the selector matches nothing (typo) or no matching pod is ready (failing readiness). Service debugging starts here, always.
+> - `port-forward svc/visits-svc 8080:80` — opens a tunnel: your laptop's `localhost:8080` → the service's port 80, through the API server. No Ingress, no NodePort, no exposure — it lives only while the command runs (foreground; Ctrl-C ends it). `curl localhost:8080` in another terminal to test.
+
 `kubectl port-forward` is the lab/debug workhorse — no exposure needed.
 
 ## 6. Namespaces
@@ -215,6 +255,8 @@ kubectl get pods -n staging
 kubectl get pods -A                  # all namespaces
 kubectl config set-context --current --namespace=staging   # switch default
 ```
+
+> **The flags:** `-n staging` scopes any command to one namespace; without a flag you're in `default`. `-A` (`--all-namespaces`) sees everything. The `config set-context` line changes what "no flag" means for your current cluster connection — handy when working in one namespace all day, and worth double-checking (`kubectl config get-contexts` shows the active default) before any `delete`.
 
 Names are unique per namespace; RBAC and quotas attach to namespaces. System
 components live in `kube-system` — look, don't touch (yet).
@@ -241,6 +283,12 @@ kubectl run tmp --rm -it --image=alpine -- sh   # throwaway debug pod inside the
 kubectl api-resources                           # what object kinds exist
 kubectl explain deployment.spec.strategy        # built-in field documentation!
 ```
+
+> **Command by command:**
+> - `get events --sort-by=.lastTimestamp` — every recent event cluster-wide, oldest first (`--sort-by` orders by any field; unsorted event output is confusingly shuffled). The "what just happened here?" view when you don't yet know *which* object is sick.
+> - `kubectl run tmp --rm -it --image=alpine -- sh` — the debug pod: `run` creates a single pod imperatively (one of the few legit uses), flags exactly like `docker run` (`--rm -it`), dropping you into a shell *inside the cluster's network*. From there, service DNS and pod IPs are testable directly: `wget -qO- http://visits-svc` (wget because alpine has no curl; `-qO-` = quiet, output to stdout). Exit the shell and the pod cleans itself up.
+> - `api-resources` — every object type this cluster knows, with short names (`po`, `deploy`, `svc`) and API groups. Also how you discover types added by extensions.
+> - `explain deployment.spec.strategy` — official docs for any field, drilled by dot-path, straight from the API server's schema. No browser, no version mismatch — the docs *are* the cluster's.
 
 `kubectl explain` deserves fame: full schema docs for any field, offline.
 

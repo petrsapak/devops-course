@@ -81,6 +81,16 @@ retag: sha-f2a1c3d  →  also 2.4.1, prod-current   (promotion = adding a pointe
 prod deploys 2.4.1                             (same bytes staging ran)
 ```
 
+In Docker commands (ch 05's tools, doing release engineering), the promotion step is just:
+
+```bash
+docker pull registry/app:sha-f2a1c3d          # the exact bytes staging validated
+docker tag  registry/app:sha-f2a1c3d registry/app:2.4.1
+docker push registry/app:2.4.1                # instant: layers already exist, only the new tag uploads
+```
+
+> **Why this is the whole trick:** `docker tag` creates a new *name* for the same image ID — no rebuild, no new bytes. Registries with a retag API (Harbor, most cloud ones) do it server-side without even the pull. Compare the anti-pattern: `docker build -t app:2.4.1 .` at release time rebuilds from source — different timestamp, possibly different dependency versions — and ships bytes nothing ever tested.
+
 Promotion adds *labels* to existing bytes — never rebuilds. Some shops use
 separate repos (`dev-images/` → `prod-images/`) with a copy step; same principle.
 

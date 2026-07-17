@@ -58,6 +58,11 @@ docker run --rm -it ubuntu:24.04 bash  # interactive shell; --rm auto-remove on 
 docker run -e LOG_LEVEL=debug myapp    # set environment variable
 ```
 
+> **Tool:** `docker` — the CLI talking to the Docker *daemon* (the background service that actually builds and runs containers). Every `docker ...` command is an API call to that daemon.
+> **`docker run` decoded** — it's three steps fused: pull the image if not local → create a container from it → start it.
+> **Flags:** `-d` **d**etached: run in the background and print the container ID; without it the container's output owns your terminal · `--name web` a handle for later commands (otherwise you get a random name like `vigorous_hopper`) · `-p 8080:80` **p**ublish a port, always `HOST:CONTAINER` order — "host port 8080 forwards to container port 80" · `-it` **i**nteractive + **t**ty, the pair you need for a usable shell · `--rm` auto-delete the container when it exits (perfect for throwaway experiments) · `-e KEY=value` set an **e**nvironment variable inside — the standard way to configure containerized apps (ch 01's "same artifact, different config").
+> **Expect:** detached mode prints a 64-char container ID and returns immediately; `curl localhost:8080` then reaches nginx. If the terminal seems to "hang", you forgot `-d` — the container is running in your foreground.
+
 `-p HOST:CONTAINER` port mapping is NAT (ch 04): the container has its own network
 namespace and private IP; publishing wires a host port to it.
 
@@ -80,6 +85,15 @@ docker stats                 # live CPU/mem per container
 docker cp web:/etc/nginx/nginx.conf .   # copy files in/out
 ```
 
+> **Command by command:**
+> - `docker ps` — running containers: ID, image, command, uptime, ports, name. `-a` adds stopped ones — essential when a container crashed and "disappeared" (it didn't; it's just not running).
+> - `docker stop web` — sends SIGTERM to the container's main process, waits 10 s for a graceful shutdown, then SIGKILLs (the ch 02 signals story, now with a deadline). `docker rm` removes a *stopped* container's record; `-f` force-combines kill+remove.
+> - `docker logs web` — everything PID 1 wrote to stdout/stderr, even after the container died. `-f` follows live, `--tail 50` starts from the last 50 lines. **This is always the first command on a misbehaving container.**
+> - `docker exec -it web sh` — start an *additional* process (here a shell) inside a running container. Look around, check env vars, curl localhost — then leave. (Some minimal images have no `sh`; try `bash` or accept that distroless images are shell-less by design — ch 06.)
+> - `docker inspect web` — the container's entire configuration and state as JSON; `-f` applies a Go template to pluck one field, or pipe to `jq` (ch 02) — both spellings are common.
+> - `docker stats` — live per-container CPU/memory table; the quick answer to "which container is eating the box?"
+> - `docker cp` — copy files between host and container, either direction (`web:/path` names the container side). Debugging convenience — anything permanent belongs in the image or a volume.
+
 Two habits that mark experienced users:
 1. **Logs to stdout/stderr**, never to files inside the container — `docker logs`
    (and every log collector in ch 15) reads the stream.
@@ -95,6 +109,8 @@ docker image prune -a        # remove unused images
 docker system prune          # all of the above (careful)
 ```
 
+> **Why this section exists:** Docker never deletes anything on its own; stopped containers, superseded image versions, and build cache accumulate until the disk fills (ch 02: full disk = classic outage). `docker system df` shows the damage per category. The `prune` commands delete what nothing references — `image prune -a` removes **a**ll images not used by at least one container, not just untagged ones. Each prompts for confirmation and prints what it reclaimed.
+
 ---
 
 ## 3. Images and layers
@@ -109,6 +125,11 @@ docker pull python:3.12-slim
 docker images                          # local images with sizes
 docker history python:3.12-slim       # the layer stack and what created each
 ```
+
+> **Command by command:**
+> - `docker pull` — download an image (all its layers) without running anything. Watch the output: `Already exists` per layer is layer-sharing working for you — only missing layers download.
+> - `docker images` — local images with tags and sizes. When this list is huge, see "Cleaning up" above.
+> - `docker history` — one line per layer, newest first: the Dockerfile instruction that created it and its size. Expect rows like `RUN pip install -r requirements.txt   58MB`. **This is how you find what bloats an image** — and a first hint that anything COPY'd into a layer (secrets included) stays visible in it forever (ch 06 security section).
 
 When a container runs, Docker adds a thin writable layer on top (copy-on-write).
 Delete the container → that layer is gone. **Persistent data therefore needs
@@ -190,6 +211,13 @@ docker run -d --name myapp -p 8000:8000 myapp:1.0.0
 curl localhost:8000/health
 ```
 
+> **`docker build` decoded:** `-t myapp:1.0.0` **t**ags the result (name:version — untagged images are unusable `<none>` orphans); the final `.` is the **build context** — the directory sent to the daemon, which `COPY` instructions read from (and which `.dockerignore` filters). Forgetting the dot is the #1 build-command typo.
+> **Expect:** one `[N/6]` step per Dockerfile instruction, `CACHED` markers on layers reused from previous builds (the caching section below explains when), and finally:
+> ```
+> => => naming to docker.io/library/myapp:1.0.0
+> ```
+> Then `docker run` starts it exactly like any pulled image — locally built and registry images are the same thing — and the `curl` should return `{"status":"ok"}`. If it doesn't: `docker logs myapp`.
+
 ### Instruction reference
 
 | Instruction | Purpose | Notes |
@@ -262,6 +290,12 @@ docker push yourname/myapp:1.0.0
 docker pull yourname/myapp:1.0.0      # from any other machine
 ```
 
+> **Command by command:**
+> - `docker login` — authenticates against a registry (Docker Hub by default; pass a hostname like `ghcr.io` for others) and caches the credential locally. In CI this happens with `--password-stdin` and an injected token — never a typed password (ch 07–08).
+> - `docker tag SOURCE TARGET` — adds another name to the *same* image (no copying — both names point to identical layers). Needed because the push destination is encoded in the name: `myapp:1.0.0` has no registry/namespace, so it can't be pushed anywhere; `yourname/myapp:1.0.0` can.
+> - `docker push` — uploads the layers the registry doesn't already have (`Layer already exists` = dedup at work), then the image manifest.
+> - `docker pull` — the reverse. Expect a digest line at the end of both: `sha256:ab12...` — the immutable identity of what you just shipped.
+
 Typical CI flow you'll automate in ch 07: build → tag with the version (and the
 git SHA) → push. Then deployment (ch 11–12) is just "pull tag X and run it" —
 the registry is the hand-off point between CI and the runtime platform.
@@ -288,6 +322,8 @@ docker rm -f myapp && docker rmi <you>/devops-myapp:1.0.0
 docker run -d --name myapp -p 8000:8000 <you>/devops-myapp:1.0.0   # pulls from Hub
 curl -s localhost:8000/health
 ```
+
+> **The one new command:** `docker rmi` — **r**e**m**ove **i**mage (locally; the registry copy is untouched). The `rm -f` + `rmi` pair wipes every local trace, so the final `docker run` *must* pull from the registry — proving the image truly round-tripped. Watch its output for the `Pulling from yourname/myapp` lines: that's your artifact coming back from the outside world.
 
 That loop — build, push, pull elsewhere, run — is the beating heart of every
 container pipeline you'll build for the rest of the course.

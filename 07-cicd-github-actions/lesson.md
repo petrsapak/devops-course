@@ -70,7 +70,13 @@ jobs:
       - run: pytest -v                      # tests
 ```
 
-Push this, and every push/PR gets a green check or a red X. That X, combined with
+> **Line by line:**
+> - `on:` — the trigger block: run on pushes to `main` and on every pull request (a bare `pull_request:` means "any PR event"). These two triggers together = "validate everything before and after merge".
+> - `runs-on: ubuntu-latest` — GitHub boots a fresh Ubuntu VM for this job. Fresh = empty: no code, no Python packages, nothing from previous runs.
+> - `uses: actions/checkout@v4` — an *action* (prepackaged step from the marketplace; `actions/` is GitHub's own namespace, `@v4` pins the major version). Checkout clones your repo into the workspace — the fresh VM doesn't even have your code until this runs.
+> - `uses: actions/setup-python@v5` + `with:` — installs the Python version you declare (`with:` passes parameters to an action); `cache: pip` transparently caches downloaded packages between runs, keyed on your requirements file.
+> - `run: ...` — plain shell commands (bash on Linux runners): install dependencies, run `ruff` (a fast Python linter), run `pytest` (the test runner; `-v` lists each test by name). Each step's exit code decides pass/fail — ch 02's exit-code convention is the entire foundation of CI.
+> **Expect:** in the repo's *Actions* tab, a run per push with each step's live log; any non-zero exit turns the step red, fails the job, and marks the commit/PR with an ✗. That X, combined with
 branch protection (ch 03), is CI as a *law*.
 
 Anatomy notes:
@@ -163,6 +169,14 @@ jobs:
           cache-from: type=gha
 ```
 
+> **The actions used, one by one:**
+> - `docker/setup-buildx-action` — enables BuildKit's advanced builder (`buildx`), needed for the cache options below and multi-platform builds. The `docker/*` namespace is Docker Inc.'s official set.
+> - `docker/login-action` — `docker login` as an action. `github.actor` = whoever triggered the run; `secrets.GITHUB_TOKEN` = an automatic, per-run token GitHub mints with exactly the `permissions:` declared above — which is why `packages: write` is there and why no personal token is stored anywhere.
+> - `docker/metadata-action` — computes image tags from the Git event so nobody hand-writes tagging logic: a PR builds `pr-42`, a main-branch push builds `sha-<commit>` + `latest`, a `v1.2.3` tag builds `1.2.3`. `id: meta` names the step so later steps can reference its output as `steps.meta.outputs.tags`.
+> - `docker/build-push-action` — `docker build`/`push` with cache wiring: `cache-from`/`cache-to: type=gha` stores image layers in GitHub's cache between runs (`mode=max` caches all layers, not just the final ones), so unchanged layers don't rebuild — ch 05's layer-cache lesson, ported to ephemeral CI machines where the local cache would otherwise be empty every time. `load: true` keeps the built image on the runner's local daemon so the *next* step can scan it.
+> - `aquasecurity/trivy-action` — ch 06's scanner as a gate. Pinned to an exact version (`@0.24.0`) rather than a floating major — third-party actions deserve tighter pinning than GitHub's own (ch 16 goes further: SHA-pinning).
+> - The `${{ ... }}` syntax is the *expression context* — variables GitHub substitutes before running the step: `github.repository`, `github.sha`, `secrets.*`, `steps.<id>.outputs.*`.
+
 Read the design decisions, they matter more than the syntax:
 
 - **`needs: test`** — the graph. No artifact without green tests.
@@ -244,6 +258,8 @@ pull downstream.)
           path: ~/.cache/pip
           key: pip-${{ hashFiles('requirements.txt') }}
 ```
+
+> **How `actions/cache` works:** at job start it restores `path` from storage if a cache entry matching `key` exists; at job end it saves `path` under that key. `hashFiles('requirements.txt')` bakes the lockfile's hash into the key, so editing dependencies produces a new key = a clean cache — you can never be poisoned by stale packages. Cache ≠ artifact: a miss must be survivable (the job just runs slower) — the ch 09 comparison table formalizes this.
 
 Key design: cache key = hash of the lockfile → dependency change = new cache.
 

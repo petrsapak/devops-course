@@ -101,6 +101,13 @@ deploy-prod:
 (Note: in real configs don't `|| true` a security gate — shown only to keep the
 lab pipeline moving; the exercises make you remove it and justify why.)
 
+> **The build-image job, line by line** (the rest of the file is ch 07's pipeline in new spelling — the table above maps it):
+> - `image: docker:27` — the job runs inside the official Docker *CLI* image…
+> - `services: [docker:27-dind]` — …and gets a **D**ocker-**in**-**D**ocker sidecar: a second container running an actual Docker daemon, reachable from the job. The CLI in the job talks to the daemon in the sidecar. This is GitLab's stock answer to "how do I `docker build` inside a container without touching the host's docker.sock" — more isolation than the ch 08 socket mount, at the cost of no shared layer cache between runs.
+> - `docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY` — all three variables are **predefined**: GitLab injects per-job credentials for the project's own built-in registry. Zero secret configuration for the most common CI task — genuinely a GitLab selling point.
+> - `docker run --rm aquasec/trivy image ...` — ch 06's scanner, run as a container since the `docker:27` image doesn't include trivy.
+> - `rules:` — evaluated top-down, first match wins: this job runs on main-branch pushes or tag pushes, and (no matching rule) simply doesn't exist on other branches — GitLab's equivalent of ch 07's `if:` gating.
+
 Reading notes:
 
 - **Everything runs in containers by default** (`image:`) — GitLab was
@@ -148,6 +155,8 @@ integration-test:
     - pip install -r requirements.txt pytest
     - pytest tests/integration -v
 ```
+
+> **How this works at runtime:** GitLab starts the `postgres:16` service container *first*, on a private network shared with the job container, reachable at hostname `db` (the `alias`; without an alias the image name doubles as hostname). The `POSTGRES_*` variables configure the service (that image reads them at init — ch 06); `DATABASE_URL` points the tests at it. Every run gets a **brand-new, empty database that vanishes with the job** — no state can bleed between runs, no cleanup step can be forgotten. If tests fail with "connection refused" immediately, the service was still booting: real setups add a wait-for-it loop or rely on the app's retry logic.
 
 The same pattern exists everywhere — learn it as a concept:
 - GitHub Actions: `services:` block on the job (same idea, same name).

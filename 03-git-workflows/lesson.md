@@ -21,9 +21,21 @@ its parent(s). Branches are just movable pointers to commits; `HEAD` is a pointe
 to your current branch.
 
 ```bash
-git log --oneline --graph --all --decorate   # learn to read this view; alias it
-git alias: git config --global alias.lg "log --oneline --graph --all --decorate"
+git log --oneline --graph --all --decorate            # learn to read this view
+git config --global alias.lg "log --oneline --graph --all --decorate"   # alias it: git lg
 ```
+
+> **Flags:** `--oneline` one commit per line (short SHA + subject) · `--graph` draws the branch/merge structure as ASCII art in the left margin · `--all` show every branch, not just the current one · `--decorate` label commits that branches/tags point at.
+> **Why:** this is the view that makes "branches are just pointers" visible — you *see* `main` and `feature/x` as labels hanging off commits.
+> **Expect:**
+> ```
+> * f2a1c3d (HEAD -> feat/retry, origin/feat/retry) Add retry to payment client
+> * 9b7e2aa (main) Fix health endpoint
+> | * 3c9d0ef (origin/main) Bump deps
+> |/
+> * 88a71b2 (tag: v1.3.0) Release 1.3.0
+> ```
+> The second line defines a git **alias**: `git config --global` writes to your `~/.gitconfig`, and afterwards `git lg` expands to the whole incantation.
 
 Three zones your changes move through:
 
@@ -40,6 +52,12 @@ git diff --staged     # staging vs last commit
 git show <commit>     # what a commit changed
 git blame file.py     # who last touched each line (and in which commit)
 ```
+
+> **Command by command:**
+> - `git status` — which files are modified/staged/untracked, plus what git suggests doing next. Cheap; run it constantly.
+> - `git diff` vs `git diff --staged` — two different questions: "what have I edited but not yet staged?" vs "what exactly will the next commit contain?" Review `--staged` before every commit — it's the last look before history.
+> - `git show <commit>` — a commit's metadata (author, date, message) followed by its full diff. `git show HEAD~2` = two commits back; `git show v1.3.0` works on tags too.
+> - `git blame file.py` — prefixes every line with the commit and author that last changed it. Not for assigning guilt: it's how you find *the commit* (and its why-explaining message and PR) behind a puzzling line. Expect: `9b7e2aa (alice 2026-03-02 14:11) timeout = 30`.
 
 ---
 
@@ -68,6 +86,9 @@ Partial staging — commit only some of your changes:
 git add -p            # interactively pick hunks: y/n/s(plit)/q
 ```
 
+> **Flag:** `-p` = **p**atch mode. Git walks you through your changes one *hunk* (contiguous block of diff) at a time and asks about each: `y` stage it, `n` skip it, `s` split into smaller hunks, `q` quit.
+> **Why:** you fixed the bug *and* tweaked an unrelated log line in the same file — patch mode lets you commit them separately, keeping commits atomic. Verify what you picked with `git diff --staged` before committing.
+
 ---
 
 ## 3. Undoing things — the safety toolbox
@@ -89,6 +110,13 @@ on shared ones.
 `git reflog` records every position HEAD has had — commits are almost never truly
 lost for ~90 days. This turns most "I destroyed the repo" panics into a 30-second fix.
 
+> **How the recovery actually goes:** `git reflog` prints HEAD's movement history, newest first:
+> ```
+> 3c9d0ef HEAD@{0}: reset: moving to HEAD~1
+> f2a1c3d HEAD@{1}: commit: Add retry to payment client
+> ```
+> There's your "lost" commit at `HEAD@{1}`. `git reset --hard f2a1c3d` moves the branch pointer (and your files) right back to it. The commit was never deleted — only the *pointer* to it was.
+
 ---
 
 ## 4. Merging vs rebasing
@@ -99,6 +127,11 @@ Two ways to integrate `main` into your feature branch:
 git merge main     # ties histories together with a merge commit; true history
 git rebase main    # replays your commits on top of main; linear history
 ```
+
+> **What each actually does** (run from your feature branch):
+> - `git merge main` — creates a single new *merge commit* with two parents (your branch's tip and main's tip). Your existing commits are untouched.
+> - `git rebase main` — takes each of your branch's commits, re-applies them one by one on top of main's current tip, and moves your branch pointer to the result. Same content, **new commits with new SHAs** — the old ones are abandoned. That's why rebasing anything already pushed and shared rewrites history under your teammates' feet.
+> **Expect after rebase:** `Successfully rebased and updated refs/heads/feat/retry.` — and `git lg` now shows your commits sitting linearly on top of main.
 
 - **Merge**: preserves what actually happened; graph gets busy.
 - **Rebase**: clean linear story; but it *rewrites your commits* (new SHAs).
@@ -204,6 +237,12 @@ git tag -l "v1.*"                        # list
 git describe --tags                      # nearest tag + distance, e.g. v1.4.0-3-gf2a1c3d
 ```
 
+> **Command by command:**
+> - `git tag -a v1.4.0 -m "..."` — `-a` makes an **a**nnotated tag: a real object with author, date, and message (`-m`), attached to the current commit. Without `-a` you get a lightweight tag — a bare pointer, fine for private bookmarks, wrong for releases.
+> - `git push origin v1.4.0` — pushes the tag explicitly. **A plain `git push` does not push tags** — forgetting this is why "I tagged the release but CI never fired" happens to everyone once.
+> - `git tag -l "v1.*"` — `-l` lists tags matching a pattern.
+> - `git describe --tags` — "where am I relative to the last release?" Output `v1.4.0-3-gf2a1c3d` reads as: nearest tag `v1.4.0`, `3` commits ahead of it, currently at commit `f2a1c3d` (the `g` just means "git"). Build systems love this string as an automatic version number.
+
 Use **annotated** tags for releases (lightweight tags are just pointers, no metadata).
 In ch 07 you'll build a pipeline that fires on `v*` tags and publishes an artifact
 whose version = the tag.
@@ -218,11 +257,13 @@ committing obvious secrets:
 ```bash
 #!/usr/bin/env bash
 # .git/hooks/pre-commit  (chmod +x)
-if git diff --cached | grep -eI "(AKIA[0-9A-Z]{16}|-----BEGIN.*PRIVATE KEY)"; then
+if git diff --cached | grep -qE "(AKIA[0-9A-Z]{16}|-----BEGIN.*PRIVATE KEY)"; then
   echo "Possible secret in staged changes — commit blocked." >&2
   exit 1
 fi
 ```
+
+> **How the hook works:** `git diff --cached` prints what's staged for this commit (same as `--staged`); `grep -qE` scans it — `-E` extended regex, `-q` **q**uiet (we only want the exit code, not the matched secret echoed into the terminal) — for two secret shapes — `AKIA` + 16 chars (the fixed prefix of AWS access key IDs) and the `-----BEGIN ... PRIVATE KEY` header of PEM key files. grep exits 0 when it *finds* something, making the `if` true → print a warning to stderr (`>&2`) and `exit 1`.
 
 Hook exits non-zero → the commit is aborted. Common uses: linting, formatting,
 commit-message format checks (`commit-msg` hook).
@@ -250,6 +291,13 @@ git bisect reset
 git bisect run ./test.sh
 ```
 
+> **How bisect works:** you give it one known-bad commit (usually the current one) and one known-good point in the past; git checks out the *middle* commit between them. You test and report `good` or `bad`; each answer halves the search space. 1000 commits = ~10 rounds to the exact culprit. `git bisect reset` returns you to where you started.
+> **The killer variant:** `git bisect run ./test.sh` automates the loop — git runs your script at every step and interprets its exit code (0 = good, non-zero = bad). Come back in a minute to:
+> ```
+> f2a1c3d is the first bad commit
+> ```
+> Combine with everything from ch 02: the "test script" can be *any* command — `curl -sf localhost:8000/health`, a pytest invocation, a grep.
+
 ### git stash — shelve work-in-progress
 
 ```bash
@@ -258,12 +306,16 @@ git stash pop         # bring them back
 git stash list
 ```
 
+> **Why it exists:** you're mid-change and suddenly need a clean working directory (urgent fix on another branch, a pull that refuses to run over dirty files). `stash` shelves your uncommitted changes onto a stack; `pop` reapplies the most recent shelf and drops it; `list` shows what's parked (`stash@{0}: WIP on main: ...`). Untracked files aren't stashed unless you add `-u`.
+
 ### cherry-pick — copy one commit to another branch (e.g., hotfix to release branch)
 
 ```bash
 git switch release/1.4
 git cherry-pick abc1234
 ```
+
+> **What it does:** `git switch` moves you onto the target branch (the modern, clearer replacement for `git checkout` when changing branches); `cherry-pick` then *copies* commit `abc1234`'s changes as a brand-new commit here. New SHA, same diff and message. The original stays where it was — you've duplicated the change, not moved it. The canonical use: a bug fixed on `main` must also land on a maintenance branch.
 
 ### .gitignore essentials
 

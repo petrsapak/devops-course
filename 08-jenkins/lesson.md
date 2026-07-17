@@ -50,6 +50,13 @@ docker run -d --name jenkins \
   jenkins/jenkins:lts-jdk17
 ```
 
+> **The `docker run` decoded** (all ch 05–06 machinery, now in anger):
+> - `-p 8080:8080` — the web UI. `-p 50000:50000` — the *inbound agent* port: build agents connecting over JNLP dial in here; harmless but unused until you add such agents.
+> - `-v jenkins_home:/var/jenkins_home` — the named volume holding every job, plugin, credential, and build log. Delete the container, keep this volume → nothing is lost. This is the single most important line.
+> - `-v /var/run/docker.sock:/var/run/docker.sock` — bind-mounts the host's Docker control socket into the container, so `docker` commands *inside* Jenkins drive the *host's* daemon. Convenient, and equivalent to giving Jenkins root on your machine — the tradeoff the notes below discuss.
+> - `jenkins/jenkins:lts-jdk17` — the official image, **LTS** (Long-Term Support) line: the stability-over-novelty channel you want for a server you must maintain.
+> **Expect:** `docker logs -f jenkins` shows startup, then the line `Jenkins is fully up and running`. The UI answers at `http://localhost:8080`.
+
 Notes:
 - `jenkins_home` volume = ALL state (jobs, config, history). Backing up Jenkins =
   backing up this directory.
@@ -62,6 +69,7 @@ Notes:
   or build a small custom image — the exercises walk through it.
 
 First-run wizard: `docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword`
+(ch 05's `exec` — run `cat` inside the running container to read the generated unlock password)
 → paste at `http://localhost:8080` → **Install suggested plugins** → create admin user.
 
 Also install (Manage Jenkins → Plugins): **Docker Pipeline**, **Blue Ocean** (nicer
@@ -160,6 +168,13 @@ pipeline {
 | `post` | always/success/failure hooks | `if: always()/failure()` |
 | `options` | timeouts, log rotation, concurrency | various |
 
+> **Lines worth pausing on:**
+> - `options { ... }` — `timestamps()` prefixes every log line with a clock (essential when correlating with server logs); `timeout(30 min)` kills hung builds instead of letting them squat an executor forever; `buildDiscarder` keeps only the last 20 builds' logs/artifacts (disk!); `disableConcurrentBuilds()` prevents two runs of the same job from colliding in the workspace.
+> - `environment { REGISTRY_CREDS = credentials('ghcr-token') }` — the credential binding: Jenkins looks up the credential stored under ID `ghcr-token` and materializes it as masked env vars `REGISTRY_CREDS_USR` / `REGISTRY_CREDS_PSW` for the pipeline's duration.
+> - `triggers { pollSCM('H/5 * * * *') }` — check Git for new commits on a schedule, in cron syntax (§: minute hour day month weekday; `H/5` = every 5 minutes, with `H` spreading the exact minute per-job so 200 jobs don't all poll at :00).
+> - `sh 'echo $REGISTRY_CREDS_PSW | docker login ... --password-stdin'` — pipes the secret into docker login's stdin instead of putting it in the argument list, where it would be visible in `ps` output and process logs (ch 02: arguments are public, stdin is not).
+> - `${GIT_COMMIT.take(7)}` — `GIT_COMMIT` is an env var Jenkins sets per build; `.take(7)` is Groovy for "first 7 characters" — producing the same short-SHA image tags as ch 07.
+
 Details that matter:
 
 - **`agent { docker { image ... } }`** runs the stage's steps inside a container —
@@ -188,6 +203,8 @@ withCredentials([usernamePassword(credentialsId: 'ghcr-token',
     sh 'echo $P | docker login ghcr.io -u $U --password-stdin'
 }
 ```
+
+> **How `withCredentials` differs from the `environment` binding:** it scopes the secret to just this block — the variables exist only between the braces, shrinking the window where a stray `sh 'env'` could leak them. Note the single quotes on the `sh` string: that makes the *shell* expand `$P` at runtime; double quotes would make *Groovy* interpolate the secret into the command string first, where Jenkins can't reliably mask it (and the linter will warn).
 
 - **Secret text** (API tokens), **SSH keys** (git/deploy), **files** (kubeconfig).
 

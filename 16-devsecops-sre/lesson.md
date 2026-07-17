@@ -44,7 +44,19 @@ Realities of running this without becoming hated:
   the suppression file becomes where security goes to die.
 - Secret scanning is the non-negotiable one to start **today** — it's cheap,
   low-noise, and the failure it prevents (ch 03: leaked key in Git history =
-  rotate, forever-compromised) is brutal.
+  rotate, forever-compromised) is brutal. Concretely:
+
+  ```bash
+  gitleaks detect --source . -v          # scan the repo INCLUDING full git history
+  ```
+
+  > **Tool:** `gitleaks` — pattern-matches known secret shapes (AWS keys, tokens,
+  > private keys — a battle-tested version of your ch 03 hook's regex) across the
+  > working tree *and every commit ever made*. `detect` is the scan mode, `-v`
+  > lists each finding with file, commit, and rule. Expect `no leaks found` — or a
+  > finding report that means: **rotate that credential now** (deleting the file in
+  > a new commit removes nothing — ch 03). Runs identically as a pre-commit hook
+  > and as a CI job.
 
 ### A2. Secrets management
 
@@ -84,12 +96,33 @@ The defense kit (most of it is discipline you already learned, now with teeth):
   rigor, to commit SHAs (`actions/checkout@<sha>` — ch 07's note, now justified:
   a hijacked `v4` tag can't reach you).
 - **SBOM** (Software Bill of Materials) — a manifest of every component in your
-  artifact (`syft` or `trivy image --format cyclonedx`). When the next Log4Shell
-  drops, "are we affected, where?" becomes a query instead of a two-week hunt.
-  Increasingly demanded by regulation and enterprise customers.
-- **Sign and verify images**: `cosign sign` in CI; the cluster admits only
-  signed images (admission policy). Provenance: this image really came from our
-  pipeline, unmodified. (SLSA is the maturity framework for this whole area.)
+  artifact. Generating one is a single command with tools you already run:
+
+  ```bash
+  trivy image --format cyclonedx --output sbom.json myapp:1.0.0
+  # or with syft (Anchore's dedicated SBOM tool):
+  syft myapp:1.0.0 -o cyclonedx-json > sbom.json
+  ```
+
+  > **What you get:** a JSON inventory — every OS package, language dependency, and
+  > version inside the image, in **CycloneDX** format (SPDX is the other standard;
+  > both are machine-readable). Attach it to the release, and when the next
+  > Log4Shell drops, "are we affected, where?" is `jq`/`grep` over stored SBOMs
+  > instead of a two-week archaeology dig. Increasingly demanded by regulation and
+  > enterprise customers.
+- **Sign and verify images**: cryptographic proof of provenance.
+
+  ```bash
+  cosign sign --key cosign.key registry/app:2.4.1      # CI signs after push
+  cosign verify --key cosign.pub registry/app:2.4.1    # deploy side verifies
+  ```
+
+  > **Tool:** `cosign` (from the Sigstore project) — signs the image's *digest* and
+  > stores the signature in the registry next to the image. `verify` fails loudly if
+  > the image was re-pushed/tampered with or was never signed by your key. In real
+  > setups CI uses "keyless" signing (an OIDC identity instead of a key file), and a
+  > cluster admission policy rejects unsigned images — making "only images from our
+  > pipeline run in prod" mechanical. (SLSA is the maturity framework for this area.)
 - **Least-privilege CI**: per-job minimal tokens (ch 07's `permissions:`),
   no long-lived cloud keys in CI (OIDC federation instead), fork PRs get no
   secrets (ch 07 — now you know why it matters this much).

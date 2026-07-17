@@ -146,6 +146,22 @@ terraform apply     # execute (shows plan again, asks approval)
 terraform destroy   # delete everything this config manages
 ```
 
+> **Command by command** (all read the `.tf` files in the current directory):
+> - `init` — downloads the providers your config requires into `.terraform/` and writes `.terraform.lock.hcl` (pinning exact provider versions — commit it, it's a lockfile like any other). Run once per fresh checkout, and again whenever providers/backend change. Expect: `Terraform has been successfully initialized!`
+> - `fmt` — rewrites files into canonical formatting (prints the names of changed files). Run it in CI as `fmt -check` — formatting debates end here, same as any code formatter.
+> - `validate` — syntax and internal consistency (bad references, type errors), no cloud/API calls.
+> - `plan` — the heart: refresh reality from the provider, diff against config, print what *would* change, change nothing. Details in the reading-a-plan section below.
+> - `apply` — plan again, show it, prompt `Do you want to perform these actions?` — type `yes` — then execute in dependency order, updating the state file. `-auto-approve` skips the prompt (labs and CI with a reviewed saved plan; nowhere else).
+> - `destroy` — a plan whose goal is "nothing this config manages exists", same confirmation flow. Precise scope: only resources in this config's *state* — it never touches things Terraform doesn't manage.
+> **Expect from `apply`:**
+> ```
+> docker_network.app: Creating...
+> docker_network.app: Creation complete after 1s [id=b1f4...]
+> docker_container.web: Creating...
+> Apply complete! Resources: 3 added, 0 changed, 0 destroyed.
+> ```
+> Note the order — network before container, derived from the reference graph, nobody wrote it down.
+
 ### Reading a plan — the professional skill
 
 ```
@@ -180,8 +196,12 @@ Consequences:
   everything" while the old resources still run — duplicates or manual cleanup
   hell. State is precious.
 - **Never edit state by hand.** Surgical tools exist:
-  `terraform state list / show / mv / rm` and `terraform import` (adopt existing
-  resources into management).
+  `terraform state list` (every address in state) / `state show docker_container.web`
+  (one resource's recorded attributes) / `state mv` (rename a resource in state after
+  refactoring config — avoids a destroy/recreate) / `state rm` (forget a resource
+  *without destroying it* — it keeps running, unmanaged) and `terraform import`
+  (the inverse: adopt an existing real resource into state so Terraform manages it
+  from now on).
 - State may contain **secrets in plaintext** (DB passwords in resource
   attributes) → state storage must be access-controlled; never commit
   `terraform.tfstate` to Git.

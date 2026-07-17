@@ -74,6 +74,15 @@ Test connectivity (the ritual first step):
 ansible all -i inventory.ini -m ping        # not ICMP! SSH + Python check
 ```
 
+> **Tool:** `ansible` — the *ad-hoc* command: run one module against a host pattern, right now. (Playbooks, next section, are the durable form; the CLI grammar is the same.)
+> **The pieces:** `all` — which hosts, by group name or pattern (`web`, `web1`, `all`) · `-i inventory.ini` — which **i**nventory file describes those hosts · `-m ping` — which **m**odule to run. Despite the name, the ping module doesn't send ICMP: it SSHes in, checks Python works, and reports — i.e., it validates the *entire Ansible control path*.
+> **Expect:**
+> ```
+> web1 | SUCCESS => { "changed": false, "ping": "pong" }
+> web2 | UNREACHABLE! => { "msg": "Failed to connect to the host via ssh: ..." }
+> ```
+> Green `SUCCESS` per host = ready for real work. `UNREACHABLE` is an SSH problem (key, user, IP — debug with ch 02's ssh directly), not an Ansible problem.
+
 ### Ad-hoc commands — parallel SSH with modules
 
 ```bash
@@ -81,6 +90,8 @@ ansible web -i inventory.ini -m command -a "uptime"
 ansible all -i inventory.ini -m setup | less        # "facts": OS, IPs, memory...
 ansible db -i inventory.ini -m apt -a "name=htop state=present" --become
 ```
+
+> **New flags:** `-a` — **a**rguments for the module: free text for `command` (the literal command line to run), `key=value` pairs for real modules (`name=htop state=present` = "the package htop should exist") · `--become` — escalate to root on the target (sudo) — required for package installs, service management, writing to `/etc` · `-m setup` — the fact-gathering module; its giant JSON of OS/network/hardware details is what playbook conditionals (`when: ansible_facts[...]`) later key off.
 
 `--become` = sudo. Ad-hoc is for inspection and emergencies; anything done twice
 belongs in a playbook.
@@ -130,6 +141,23 @@ ansible-playbook -i inventory.ini site.yml
 ansible-playbook -i inventory.ini site.yml --check --diff   # DRY RUN + show diffs
 ansible-playbook -i inventory.ini site.yml --limit web1     # subset
 ```
+
+> **Tool:** `ansible-playbook` — executes a playbook: for each play, gather facts from the targeted hosts, then run every task against them (in parallel across hosts, sequential within a host).
+> **Flags:** `--check` — dry run: modules report what they *would* change without changing it; `--diff` adds unified diffs of file/template changes. Together they are Ansible's `terraform plan`, and belong in CI on every PR · `--limit web1` — restrict this run to a subset of the play's hosts (one canary machine first, then the fleet — pairs with `serial`, §6).
+> **Expect:**
+> ```
+> TASK [Install nginx] *******************************************
+> ok: [web2]
+> changed: [web1]
+>
+> RUNNING HANDLER [Reload nginx] *********************************
+> changed: [web1]
+>
+> PLAY RECAP *****************************************************
+> web1 : ok=3  changed=2  unreachable=0  failed=0
+> web2 : ok=3  changed=0  unreachable=0  failed=0
+> ```
+> Read the recap like a ledger: `changed=2` on web1 (it acted), `changed=0` on web2 (already correct — idempotency visible). Note the handler ran only on web1 — the only host whose config actually changed. **A second run should show `changed=0` everywhere; if a task reports `changed` every run, it's written non-idempotently (usually a naked `shell` task) — fix it.**
 
 ### The concepts inside
 
@@ -189,6 +217,9 @@ ansible-vault create group_vars/db/vault.yml     # opens editor; content encrypt
 ansible-vault edit group_vars/db/vault.yml
 ansible-playbook site.yml --ask-vault-pass       # or --vault-password-file
 ```
+
+> **Tool:** `ansible-vault` — symmetric encryption for YAML files, built into Ansible. `create`/`edit` open your `$EDITOR` with plaintext and encrypt on save (`view` for read-only; `encrypt`/`decrypt` convert existing files). On disk you see only `$ANSIBLE_VAULT;1.1;AES256` + hex — safe to commit.
+> **At run time:** `--ask-vault-pass` prompts interactively; `--vault-password-file ~/.vault_pass` reads the password from a (0600-permission, gitignored) file — the non-interactive form CI uses, with the password injected from the CI secret store (ch 07).
 
 Inside — normal YAML (`db_password: s3cret`); on disk — AES256 ciphertext.
 Pattern: keep a plaintext `vars.yml` referencing `{{ vault_db_password }}` from

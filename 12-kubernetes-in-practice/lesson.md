@@ -124,6 +124,15 @@ kubectl autoscale deploy visits --min=2 --max=10 --cpu-percent=70
 kubectl get hpa -w
 ```
 
+> **What this creates:** an HPA object (yes, it's YAML-able too — the imperative form is for the lab) that watches the deployment's average CPU and adjusts `replicas` between 2 and 10, aiming at 70% of *requested* CPU.
+> **Flags:** `--min`/`--max` the allowed replica range (min 2 = HA floor even at zero traffic) · `--cpu-percent=70` the target utilization · `-w` on the get = **w**atch: stream changes live instead of one snapshot (works on any `kubectl get`).
+> **Expect:**
+> ```
+> NAME     REFERENCE           TARGETS    MINPODS  MAXPODS  REPLICAS
+> visits   Deployment/visits   43%/70%    2        10       3
+> ```
+> `TARGETS <unknown>/70%` means the metrics-server isn't installed or requests aren't set — the two prerequisites, both named above. Generate load (exercises) and watch REPLICAS climb; scale-*down* happens minutes later by design (flap damping).
+
 Requires the metrics-server (Docker Desktop: install via its manifest; kind:
 same). CPU% is measured **against requests** — another reason requests must be
 truthful. Beyond CPU: custom metrics (requests/sec via Prometheus adapter).
@@ -139,6 +148,9 @@ that must be installed — Ingress objects are inert without one.
 # lab install (kind/docker-desktop):
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
 ```
+
+> **What this does:** `kubectl apply -f` accepts a URL as happily as a local file — this one is the ingress-nginx project's published manifest bundle, creating a namespace, the controller Deployment, its Service, RBAC, and admission webhooks in one shot. Watch it come up with `kubectl get pods -n ingress-nginx` until the controller pod is `Running`.
+> **The trust question you should be asking:** you just applied YAML from the internet to your cluster. For a lab, fine; the diligent version is to download it first, read it, and pin a versioned URL instead of `main`. In production this arrives via Helm with a pinned chart version (§6) — same software, reviewable supply chain (ch 16).
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -246,6 +258,14 @@ helm rollback visits 1
 helm template ./mychart | less                         # render locally — review before applying!
 helm list
 ```
+
+> **Tool:** `helm` — the Kubernetes package manager. A deployed chart instance is a **release** with a name (`visits` here) and numbered revisions — that's the unit `upgrade`/`rollback`/`list` operate on.
+> **Command by command:**
+> - `install visits ./mychart` — render the templates with `values.yaml`, apply the result, record it as release `visits` revision 1. Expect a `STATUS: deployed` summary.
+> - `upgrade visits ./mychart --set image.tag=1.3.0` — re-render with overrides and apply the diff; revision 2. `--set key=value` is a one-off override; `-f values-prod.yaml` layers a whole file (later sources win over `values.yaml` defaults). Prefer files in Git over `--set` for anything repeated — same reviewability argument as everywhere in this course.
+> - `rollback visits 1` — re-apply revision 1's manifests. Deployment rollback, chart-scoped.
+> - `template ./mychart` — render to stdout *without touching the cluster*: the plan-before-apply habit (ch 13 formalizes it). Pipe through `less` or diff against what's running.
+> - `list` — releases in the current namespace with revision and chart version.
 
 Two distinct uses:
 
