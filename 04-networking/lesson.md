@@ -56,6 +56,19 @@ Quick table:
 Rule of thumb: addresses = 2^(32 − prefix). You'll use CIDR constantly: cloud VPCs,
 Kubernetes pod/service ranges, firewall rules.
 
+**Worked example** — is `10.0.5.130` inside `10.0.4.0/22`?
+
+1. `/22` leaves 10 host bits → 2^10 = 1024 addresses per block. In octet terms:
+   22 = 16 + 6, so the third octet carries 6 network bits and steps in jumps of
+   2^(8−6) = 4 → valid `/22` networks are `10.0.0.0`, `10.0.4.0`, `10.0.8.0`, …
+2. `10.0.4.0/22` therefore spans `10.0.4.0` – `10.0.7.255` (network address first,
+   broadcast address last).
+3. `10.0.5.130` falls inside that span → **yes**.
+
+The same mechanics answer "what's the network/broadcast address" (first/last of
+the span) and "do these two subnets overlap" (do the spans intersect). Check any
+answer with `ipcalc 10.0.4.0/22` — exercise 4.2 drills this by hand first.
+
 ### 2.3 Ports
 
 A port identifies a *process* endpoint on a host. `IP:port` = one socket.
@@ -386,5 +399,29 @@ concept is identical.
 - *High Performance Browser Networking* (free online) — chs. on TCP, TLS, HTTP.
 - nginx docs: "NGINX Reverse Proxy" and "HTTP Load Balancing" guides.
 - Julia Evans' networking zines (wizardzines.com) — excellent mental models.
+
+## Abbreviations
+
+| Abbreviation | Stands for | In a nutshell |
+|---|---|---|
+| IP | Internet Protocol (address) | The addressing scheme every device on a network uses |
+| TCP | Transmission Control Protocol | Reliable, ordered, connection-based transport (HTTP, SSH ride on it) |
+| UDP | User Datagram Protocol | Fire-and-forget, connectionless transport (DNS queries, metrics) |
+| DNS | Domain Name System | Resolves names to IP addresses through a chain of resolvers |
+| CIDR | Classless Inter-Domain Routing | The `/24`-style notation describing an IP range's size |
+| TTL | Time To Live | How long a DNS answer may be cached (or how many hops a packet survives) |
+| TLS | Transport Layer Security | The encryption/authentication layer under HTTPS |
+| HTTP(S) | HyperText Transfer Protocol (Secure) | The web's request/response protocol, plain or TLS-wrapped |
+| SNI | Server Name Indication | Hostname sent during the TLS handshake so the server presents the right certificate |
+| SAN | Subject Alternative Name | The list of hostnames a certificate is actually valid for |
+| CN | Common Name | Legacy certificate field for the hostname (superseded by SAN) |
+| CA | Certificate Authority | The entity that signs and vouches for a certificate's authenticity |
+| SYN / ACK | Synchronize / Acknowledge | The TCP handshake's packet flags |
+| NAT | Network Address Translation | Lets many private IPs share one public IP |
+| LB | Load Balancer | Distributes traffic across multiple backend instances |
+| ICMP | Internet Control Message Protocol | The protocol `ping` uses to test reachability |
+| RFC | Request For Comments | The standards documents that define internet protocols |
+| MX / TXT / NS / CNAME / AAAA | Mail eXchange / Text / Name Server / Canonical Name / IPv6 Address | DNS record types for different kinds of lookups |
+| ISP | Internet Service Provider | The company providing your connection to the internet |
 
 **Next:** [Exercises](exercises.md) → [Test](test.md) → [Chapter 05: Docker Fundamentals](../05-docker-fundamentals/lesson.md)

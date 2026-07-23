@@ -18,8 +18,8 @@ you plot instead?
 **Q5.** Your teammate adds a `user_id` label to the request counter. What
 happens, why, and what's the rule they broke?
 
-**Q6.** Write the PromQL for: 5xx error *ratio* over the last 5 minutes. Why is
-a ratio preferred over an absolute error rate for alerting?
+**Q6.** Write the PromQL for the 5xx error *ratio* over five minutes, then give
+a suitable recording-rule name. Why should dashboards and alerts reuse it?
 
 **Q7.** Expand RED and USE, and state which applies to a payment API vs a
 database connection pool.
@@ -73,8 +73,9 @@ each uses.
    sum(rate(app_requests_total{status=~"5.."}[5m]))
      / sum(rate(app_requests_total[5m]))
    ```
-   Ratios stay meaningful as traffic changes: 5 err/s is catastrophic at
-   10 req/s and noise at 10k req/s — absolute thresholds can't be tuned for both.
+   A suitable name is `job:http_errors:ratio5m`. Ratios remain meaningful as
+   traffic changes; reusing the recorded series makes the dashboard and alert
+   share one reviewed definition while reducing repeated query work.
 7. RED: Rate, Errors, Duration — for request-serving services → the payment
    API. USE: Utilization, Saturation, Errors — for resources → the connection
    pool (busy %, waiters queued, connection errors).
@@ -118,5 +119,5 @@ each uses.
 </details>
 
 **Scoring:** 12+ → [Chapter 16](../16-devsecops-sre/lesson.md). Below → redo
-exercises 15.3, 15.5, 15.8 — dashboards, alert lifecycle, and the on-call drill
-are the practice that makes this real.
+exercises 15.3, 15.5, 15.8, and 15.9 — dashboards, alert lifecycle, incident
+response, and recording rules are the practice that makes this real.

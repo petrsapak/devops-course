@@ -1,7 +1,7 @@
 # DevOps Course — From Developer to DevOps Engineer
 
 A hands-on curriculum that takes a software developer with basic engineering skills to
-practical, job-ready fluency with the tools and practices used in modern DevOps.
+a practical, job-ready foundation in the tools and practices used in modern DevOps.
 
 ## How this course works
 
@@ -18,7 +18,10 @@ practical, job-ready fluency with the tools and practices used in modern DevOps.
 
 ## Estimated effort
 
-Roughly 60–80 hours total. Suggested pace: 2 chapters per week ≈ 2 months.
+Roughly 90–130 hours including the capstone. A sustainable pace is one chapter
+per week plus four to six weeks for the capstone. The course builds broad,
+hands-on competence; production fluency comes from operating real systems after
+the course.
 
 ## Curriculum
 
@@ -54,6 +57,21 @@ Roughly 60–80 hours total. Suggested pace: 2 chapters per week ≈ 2 months.
 - Command examples are followed by a quoted **breakdown block** explaining the
   tools being run, each flag, why the command is used there, and what output to
   expect. Read the breakdown before running the command.
+- Each lesson ends with an **Abbreviations** table spelling out every acronym
+  used in that chapter, with a one-line explanation.
 - Long commands are broken with `\` line continuations — paste them whole.
-- Example app used across chapters: a small HTTP service (provided in chapter folders
-  when needed) so you're always deploying *something real*.
+- The recurring example app is supplied as a runnable
+  [visits-platform lab](labs/visits-platform/README.md), with Docker, CI,
+  Kubernetes, Helm, Terraform, Ansible, and observability assets. Chapters ask
+  you to extend the same system rather than recreate disconnected snippets.
+
+## Repository quality and maintenance
+
+- Run `pwsh -File scripts/Test-Course.ps1` before committing.
+- Automated checks validate chapter structure, links, Markdown, application
+  tests, and Compose models.
+- See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution expectations and
+  [docs/MAINTENANCE.md](docs/MAINTENANCE.md) for the release and version-review
+  policy.
+- Course content is CC BY 4.0; code and configuration are MIT licensed. See
+  [LICENSE.md](LICENSE.md).

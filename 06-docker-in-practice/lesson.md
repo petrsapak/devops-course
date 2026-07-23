@@ -174,8 +174,23 @@ Notes that save pain:
   connections yet."
 - Environment-specific overrides: `compose.override.yaml` is merged automatically;
   `docker compose -f compose.yaml -f compose.prod.yaml up` for explicit stacking.
-- Secrets don't belong in the YAML — use `env_file: .env` (gitignored) for dev;
-  real secret management is ch 16.
+- Secrets don't belong in the YAML — for dev, `env_file: .env` (gitignored)
+  works; one step better is Compose's native `secrets:` mechanism, which mounts
+  each secret as a **file** instead of an env var (env vars leak into
+  `docker inspect`, error reports, and child processes; files don't):
+
+  ```yaml
+  services:
+    api:
+      secrets: [db_password]            # appears at /run/secrets/db_password
+  secrets:
+    db_password:
+      file: ./secrets/db_password.txt   # gitignored
+  ```
+
+  The app reads `/run/secrets/db_password` at startup (many images support a
+  `*_FILE` env convention, e.g. `POSTGRES_PASSWORD_FILE`, for exactly this).
+  Real secret management is ch 16.
 - Compose is a **dev/single-host tool**. Production orchestration across many
   hosts is Kubernetes (ch 11) — same concepts, bigger machine.
 
@@ -372,5 +387,18 @@ without a trace. That reproducibility is the point.
 - Docker docs: "Storage", "Networking", "Compose", "Multi-stage builds".
 - `dive` (github.com/wagoodman/dive), Trivy docs (aquasecurity.github.io/trivy).
 - OWASP Docker Security Cheat Sheet.
+
+## Abbreviations
+
+| Abbreviation | Stands for | In a nutshell |
+|---|---|---|
+| DNS | Domain Name System | How containers on a user-defined network resolve each other by name |
+| RAM | Random-Access Memory | Working memory; what `--memory` limits and OOM-killer watches |
+| MB / GB | Megabyte / Gigabyte | Units of image size shrunk by multi-stage builds |
+| CVE | Common Vulnerabilities and Exposures | Public ID for a known security vulnerability, what Trivy scans for |
+| OWASP | Open Web Application Security Project | Nonprofit behind the security cheat sheets referenced throughout |
+| OOM | Out Of Memory | Kernel condition that kills a container exceeding its memory limit |
+| YAML | YAML Ain't Markup Language | The indentation-based format `compose.yaml` is written in |
+| DB | Database | Shorthand for the stateful service (e.g. Postgres) in the stack |
 
 **Next:** [Exercises](exercises.md) → [Test](test.md) → [Chapter 07: CI/CD & GitHub Actions](../07-cicd-github-actions/lesson.md)

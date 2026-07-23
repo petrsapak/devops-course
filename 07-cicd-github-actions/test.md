@@ -10,7 +10,7 @@ tests, in a pipeline?
 **Q2.** In GitHub Actions, what is the relationship between workflows, jobs, and
 steps, and which of them run in parallel by default?
 
-**Q3.** Why does nearly every job start with `uses: actions/checkout@v4`?
+**Q3.** Why does nearly every job start with `uses: actions/checkout@v7`?
 
 **Q4.** Job B consumes an image built by job A. What two things are required for
 this to work reliably? (Think: ordering + how the image travels.)
@@ -47,8 +47,8 @@ ghcr.io, though login succeeded. Most likely fix?
 **Q14.** Why should a *scheduled* (nightly) vulnerability scan exist even though
 every build already scans the image at build time?
 
-**Q15.** Translate concepts: for Jenkins and GitLab CI, name the equivalent of
-(a) the workflow YAML file, (b) a runner, (c) `needs:` ordering.
+**Q15.** What makes a GitHub Actions workflow reusable, how does a caller invoke
+it, and what are the closest reuse mechanisms in Jenkins and GitLab CI?
 
 ---
 
@@ -94,9 +94,10 @@ every build already scans the image at build time?
 14. New CVEs are disclosed daily against *unchanged* images — an image that
     scanned clean at build time can be vulnerable a week later. Recurring scans
     catch that; build-time scans can't.
-15. (a) `Jenkinsfile` / `.gitlab-ci.yml`; (b) agent (node) / runner;
-    (c) stage ordering in the `stages {}` block (or `parallel`) / `stages:` +
-    `needs:`.
+15. The called workflow declares `on: workflow_call` and typed inputs/secrets;
+    a caller job invokes it with `uses: owner/repo/.github/workflows/file.yml@ref`
+    (or a local path) plus `with:`/`secrets:`. Jenkins uses Shared Libraries;
+    GitLab uses `include:` with templates and `extends:`.
 
 </details>
 

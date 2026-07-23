@@ -3,6 +3,11 @@
 Work in `~/devops/ch15`. You'll assemble the full observability stack around the
 visits app, then use it like an on-call engineer.
 
+The [visits-platform observability lab](../labs/visits-platform/README.md)
+contains a working Compose stack, provisioned data sources and dashboard,
+recording/alert rules, and runbooks. Build each component first, then compare
+your configuration with the reference.
+
 ## Lab scaffold
 
 `compose.yaml` services (build it up through the exercises):
@@ -12,7 +17,7 @@ visits app, then use it like an on-call engineer.
 - `prometheus` — `prom/prometheus`, config bind-mounted
 - `grafana` — `grafana/grafana`, port 3000
 - `loki` — `grafana/loki`
-- `promtail` — `grafana/promtail`, with the Docker socket/log path mounted
+- `alloy` — `grafana/alloy`, with the Docker socket mounted read-only
 - `node-exporter` — `prom/node-exporter`
 
 (Official images all have compose examples in their docs — assembling this IS
@@ -69,8 +74,8 @@ Restart it. You just watched an incident on your own dashboard.
 1. Convert the app's logging to JSON-per-line on stdout (Python: `json.dumps`
    in a logging formatter, or structlog) — include level, msg, path, status,
    and duration_ms.
-2. Add loki + promtail to compose (promtail scraping Docker container logs —
-   the grafana/promtail docs compose snippet does this).
+2. Add Loki + Alloy to Compose (`discovery.docker` +
+   `loki.source.docker`, with the Docker socket mounted read-only).
 3. Grafana → add Loki datasource → Explore:
    - `{container=~".*api.*"}` — raw stream
    - `| json | level="error"` — errors only (make some: stop the db again)
@@ -135,13 +140,29 @@ then diagnose using ONLY Grafana (no docker CLI until you've named the culprit):
 - stop the db
 - `docker compose pause api` (hangs, doesn't die)
 - add `&& sleep 2` inside the visits handler (latency, not errors)
-- kill promtail (logs go dark — meta-incident!)
+- kill Alloy (logs go dark — meta-incident!)
 
 Write the incident timeline as you go: alert seen → dashboard observation →
 hypothesis → log query → root cause.
 
 **Verify:** you named the culprit from telemetry alone, and your timeline reads
 like the post-mortems you'll write in ch 16.
+
+## Exercise 15.9 — Turn dashboard queries into recording rules
+
+1. Identify the three most repeated or expensive dashboard queries: request
+   rate, error ratio, and p95 latency.
+2. Add recording rules using the `level:metric:operations` naming convention:
+   `job:http_requests:rate5m`, `job:http_errors:ratio5m`, and
+   `job:http_request_duration_seconds:p95_5m`.
+3. Run `promtool check rules` before reloading Prometheus.
+4. Replace the dashboard panels and HighErrorRate alert with the recorded
+   series.
+5. Compare raw and recorded results over the same time range.
+
+**Verify:** `promtool` passes, all three recorded series return data, the
+dashboard and alert share one definition, and the raw and recorded results
+agree within one evaluation interval.
 
 ---
 

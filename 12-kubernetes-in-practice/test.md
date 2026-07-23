@@ -46,9 +46,10 @@ concept?
 happens when someone `kubectl edit`s a synced resource with self-heal on,
 (c) how do you roll back, (d) why does CI never need cluster credentials?
 
-**Q15.** Design: your visits app needs — staging and prod in one cluster,
-different config per env, secrets not in Git, zero-downtime deploys, rollback
-via Git history. Name the K8s/toolchain feature answering each requirement.
+**Q15.** Design: your visits app needs staging and prod isolation, external
+secrets, zero-downtime deploys, Git rollback, protection during node drains,
+default-deny networking, and replica spreading. Name the K8s/toolchain feature
+answering each requirement.
 
 ---
 
@@ -99,13 +100,15 @@ via Git history. Name the K8s/toolchain feature answering each requirement.
     is detected and reverted to Git's state. (c) `git revert` + push — the
     operator syncs the cluster backward. (d) Pull model: nothing outside the
     cluster ever holds apply-credentials; CI only pushes images and Git commits.
-15. Staging/prod in one cluster: namespaces. Per-env config: ConfigMaps +
-    per-env Helm values. Secrets not in Git: external secret manager /
-    sealed-secrets. Zero-downtime: Deployment rolling update + readiness probes.
-    Rollback via Git: GitOps (Argo CD) with revert.
+15. Isolation: namespaces plus per-environment Helm values. Secrets: an
+    external secret manager/operator. Zero-downtime: Deployment rolling update
+    plus readiness probes. Git rollback: Argo CD syncing a reverted commit.
+    Node drains: PodDisruptionBudget. Default-deny and explicit flows:
+    NetworkPolicy enforced by a supporting CNI. Replica spreading: pod
+    anti-affinity or topology spread constraints.
 
 </details>
 
 **Scoring:** 12+ → [Chapter 13](../13-terraform/lesson.md). Below → redo
-exercises 12.2, 12.4, 12.8 — probes, HPA mechanics, and the GitOps loop are the
-chapter's spine.
+exercises 12.2, 12.4, 12.8, and 12.9 — probes, HPA mechanics, GitOps, and
+production guardrails are the chapter's spine.

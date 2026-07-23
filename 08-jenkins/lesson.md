@@ -304,4 +304,17 @@ control, compliance, or legacy demand it — often both coexist.
 - jenkins.io/doc — Pipeline syntax reference and "Pipeline: Getting Started".
 - jenkins.io/doc/book/managing/casc/ — Configuration as Code.
 
+## Abbreviations
+
+| Abbreviation | Stands for | In a nutshell |
+|---|---|---|
+| LTS | Long-Term Support | The stability-over-novelty release channel used for the Jenkins image |
+| JNLP | Java Network Launch Protocol | How build agents connect inbound to the Jenkins controller |
+| JCasC | Jenkins Configuration as Code | Plugin for defining Jenkins' system config in versioned YAML |
+| SSO | Single Sign-On | One login shared across multiple systems |
+| VPN | Virtual Private Network | Encrypted network tunnel keeping Jenkins off the public internet |
+| SaaS | Software as a Service | Vendor-hosted CI (GitHub Actions, GitLab SaaS) contrasted with self-hosted Jenkins |
+| CVE | Common Vulnerabilities and Exposures | Public ID for a known vulnerability — a reason to keep plugins updated |
+| CLI | Command-Line Interface | Jenkins' own CLI for scripting admin tasks |
+
 **Next:** [Exercises](exercises.md) → [Test](test.md) → [Chapter 09: GitLab CI](../09-gitlab-ci-patterns/lesson.md)

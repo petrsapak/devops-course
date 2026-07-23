@@ -1,0 +1,92 @@
+name: Course quality
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 4 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  curriculum:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Validate course structure and local links
+        shell: pwsh
+        run: ./scripts/Test-Course.ps1
+      - name: Lint Markdown
+        uses: DavidAnson/markdownlint-cli2-action@v24.1.0
+
+  lab:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: labs/visits-platform
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: labs/visits-platform/requirements-dev.txt
+      - uses: azure/setup-helm@v5.0.1
+        with:
+          version: v4.2.0
+      - uses: hashicorp/setup-terraform@v4.0.1
+        with:
+          terraform_version: 1.15.4
+      - name: Install lab dependencies
+        run: python -m pip install --requirement requirements-dev.txt
+      - name: Run application tests
+        run: pytest --quiet
+      - name: Validate Compose models
+        run: |
+          cp .env.example .env
+          docker compose config --quiet
+          docker compose -f compose.yaml -f compose.observability.yaml config --quiet
+      - name: Validate Helm chart
+        run: helm lint helm/visits
+      - name: Validate Terraform
+        run: |
+          terraform -chdir=infra/terraform fmt -check
+          terraform -chdir=infra/terraform init -backend=false
+          terraform -chdir=infra/terraform validate
+      - name: Validate observability configuration
+        run: |
+          docker run --rm \
+            --volume "$PWD/observability/prometheus:/etc/prometheus:ro" \
+            --entrypoint /bin/promtool prom/prometheus:v3.12.0 \
+            check config /etc/prometheus/prometheus.yml
+          docker run --rm \
+            --volume "$PWD/observability/alloy:/etc/alloy:ro" \
+            grafana/alloy:v1.16.1 \
+            validate /etc/alloy/config.alloy
+          docker run --rm \
+            --volume "$PWD/observability/alertmanager:/etc/alertmanager:ro" \
+            --entrypoint /bin/amtool prom/alertmanager:v0.32.1 \
+            check-config /etc/alertmanager/alertmanager.yml
+          docker run --rm \
+            --volume "$PWD/observability/loki:/etc/loki:ro" \
+            grafana/loki:3.7.2 \
+            -verify-config=true -config.file=/etc/loki/loki.yml
+      - name: Build both deployables
+        run: |
+          docker build --target api --tag visits-api:quality-check .
+          docker build --target worker --tag visits-worker:quality-check .
+
+  external-links:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check external links
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --config .lychee.toml "./**/*.md"
+          fail: true
+          token: ${{ secrets.GITHUB_TOKEN }}

@@ -3,6 +3,10 @@
 Work in `~/devops/ch16` and your CI repo from ch 07. These wire the security
 stack into the pipeline you already own, then drill the SRE practices.
 
+Use the [visits-platform lab](../labs/visits-platform/README.md) as the scanning
+target. It includes hardened container/Kubernetes settings, metrics, alerts,
+and runbooks, so findings can be judged against explicit operational choices.
+
 ---
 
 ## Exercise 16.1 — Secret scanning, both ends

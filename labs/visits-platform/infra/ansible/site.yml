@@ -1,0 +1,21 @@
+- name: Configure course web fleet
+  hosts: web
+  become: true
+  serial: 1
+  max_fail_percentage: 0
+
+  roles:
+    - web
+
+  post_tasks:
+    - name: Verify the node from the control machine
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ hostvars[inventory_hostname].published_http_port }}"
+        return_content: true
+        status_code: 200
+      register: web_response
+      retries: 5
+      delay: 1
+      until: inventory_hostname in web_response.content
+      delegate_to: localhost
+      become: false

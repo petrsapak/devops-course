@@ -1,0 +1,30 @@
+# Editors and operating systems
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.tmp-tools/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+
+# Local course configuration and generated reports
+.env
+coverage.xml
+report.xml
+sbom.json
+sessions/
+
+# Terraform and generated infrastructure credentials
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+**/.keys/
+labs/visits-platform/infra/terraform/inventory.ini
+
+# Ansible
+*.retry

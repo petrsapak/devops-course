@@ -3,6 +3,10 @@
 These run entirely on your machine: Jenkins in Docker + your local Git repos.
 Budget a full evening — Jenkins rewards patience.
 
+> The [visits-platform lab](../labs/visits-platform/README.md) includes a
+> declarative `Jenkinsfile` that publishes JUnit results. Build yours during the
+> exercises, then compare stage structure and failure handling.
+
 ---
 
 ## Exercise 8.1 — Install and tour

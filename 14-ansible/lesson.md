@@ -293,13 +293,45 @@ strategy, for config):
 `ansible-lint` + `--check --diff` (the plan); merge runs the playbook (the
 apply); secrets via vault + CI-injected vault password.
 
-**Terraform + Ansible together** — the classic handoff: TF creates VMs and
-writes their IPs into an inventory (or dynamic inventory reads the cloud);
-Ansible configures them. Provision → configure, each tool in its lane.
+**Terraform + Ansible together** — the classic handoff: Terraform creates the
+machines, Ansible makes them correct. The minimal mechanical link is Terraform
+*generating the inventory file* as just one more resource:
+
+```hcl
+# alongside the ch 13 for_each fleet (exercise 13.5):
+resource "local_file" "inventory" {
+  filename = "${path.module}/inventory.ini"
+  content  = <<-EOT
+    [web]
+    %{~ for c in docker_container.web ~}
+    ${c.name} ansible_host=${c.network_data[0].ip_address}
+    %{~ endfor ~}
+
+    [all:vars]
+    ansible_user=ansible
+    ansible_ssh_private_key_file=~/.ssh/ansible_lab
+  EOT
+}
+```
+
+```bash
+terraform apply -auto-approve && ansible-playbook -i inventory.ini site.yml
+```
+
+> **How the handoff works:** `local_file` is a resource like any other — created/updated on apply, so the inventory always reflects the machines Terraform just made. The `%{ for }` template loop writes one host line per container, pulling each *real* IP from provider attributes; nothing is typed by hand, so nothing goes stale. The `&&` (ch 02) chains the tools: provision, then configure, one command.
+> **At scale** the generated file gives way to **dynamic inventory** (§2) — the `aws_ec2`/`azure_rm` inventory plugins query the cloud API live at playbook start, so there is no file to go stale at all. Either way the division of labor is identical: Terraform owns *existence*, Ansible owns *contents*.
 
 ## Further reading
 
 - docs.ansible.com — "Get started", module index (bookmark it), Vault docs.
 - Jeff Geerling, *Ansible for DevOps* — the practical classic (+ his galaxy roles as examples).
+
+## Abbreviations
+
+| Abbreviation | Stands for | In a nutshell |
+|---|---|---|
+| SSH | Secure Shell | The encrypted transport Ansible uses to reach every managed host |
+| YAML | YAML Ain't Markup Language | The format playbooks and inventories are written in |
+| AES256 | Advanced Encryption Standard, 256-bit key | The cipher `ansible-vault` uses to encrypt secret files at rest |
 
 **Next:** [Exercises](exercises.md) → [Test](test.md) → [Chapter 15: Monitoring & Observability](../15-monitoring-observability/lesson.md)

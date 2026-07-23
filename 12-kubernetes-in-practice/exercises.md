@@ -4,6 +4,11 @@ Continues from ch 11's cluster and visits/whoami deployments. Work in
 `~/devops/ch12`. These exercises stack — do them in order; by 12.8 you'll have
 the full production-shaped app.
 
+The [visits-platform lab](../labs/visits-platform/README.md) includes raw
+manifests and a Helm chart with probes, resources, autoscaling, disruption
+protection, and network policy. Render it with `helm template` when comparing
+your work.
+
 ---
 
 ## Exercise 12.1 — ConfigMap + Secret wiring
@@ -127,6 +132,23 @@ the durable thing); the full app now runs in-cluster. Note why `replicas: 1`
 **Verify:** the cluster obeyed Git twice (sync + revert) and *overrode your
 manual kubectl* — you experienced "Git as the single source of truth" rather
 than reading about it.
+
+## Exercise 12.9 — Prove the production guardrails
+
+1. Add a PodDisruptionBudget requiring one API replica to remain available.
+   Run `kubectl drain <node> --ignore-daemonsets --delete-emptydir-data` on a
+   disposable local-cluster node and observe the eviction behavior.
+2. Apply a default-deny ingress and egress NetworkPolicy, then add only DNS,
+   ingress-controller → API, and API → PostgreSQL allowances.
+3. Launch a temporary curl pod. Prove that an unapproved path is blocked and
+   the approved API path still works. If your local CNI does not enforce
+   NetworkPolicy, document that fact and repeat on kind with a supporting CNI.
+4. Add pod anti-affinity preferring API replicas on different nodes. Inspect
+   scheduling with `kubectl get pods -o wide`.
+
+**Verify:** you captured evidence for one allowed and one denied connection,
+the PDB limits voluntary disruption, and the scheduler spreads replicas when
+multiple nodes are available.
 
 ---
 

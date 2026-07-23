@@ -1,0 +1,104 @@
+name: visits-platform
+
+services:
+  api:
+    build:
+      context: .
+      target: api
+    image: visits-api:${APP_VERSION:-dev}
+    environment:
+      APP_VERSION: ${APP_VERSION:-dev}
+      DB_HOST: db
+      DB_PASSWORD_FILE: /run/secrets/db_password
+      FEATURE_STATS: ${FEATURE_STATS:-false}
+      POSTGRES_DB: ${POSTGRES_DB:-visits}
+      POSTGRES_USER: ${POSTGRES_USER:-visits}
+    secrets:
+      - db_password
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    networks:
+      - frontend
+      - backend
+
+  worker:
+    build:
+      context: .
+      target: worker
+    image: visits-worker:${APP_VERSION:-dev}
+    environment:
+      DB_HOST: db
+      DB_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_DB: ${POSTGRES_DB:-visits}
+      POSTGRES_USER: ${POSTGRES_USER:-visits}
+      WORKER_INTERVAL_SECONDS: "30"
+    secrets:
+      - db_password
+    ports:
+      - "127.0.0.1:8001:8001"
+    depends_on:
+      db:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    networks:
+      - backend
+
+  db:
+    image: postgres:16.4-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-visits}
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_USER: ${POSTGRES_USER:-visits}
+    secrets:
+      - db_password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-visits} -d ${POSTGRES_DB:-visits}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - backend
+
+  adminer:
+    image: adminer:4.8.1
+    profiles: ["tools"]
+    ports:
+      - "127.0.0.1:8082:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend
+
+secrets:
+  db_password:
+    environment: POSTGRES_PASSWORD
+
+volumes:
+  postgres-data:
+
+networks:
+  frontend:
+  backend:
+    internal: true

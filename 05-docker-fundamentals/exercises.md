@@ -2,6 +2,11 @@
 
 Work in `~/devops/ch05`. Docker Desktop must be running.
 
+> **Starter files:** copy
+> [`labs/visits-platform`](../labs/visits-platform/README.md) into your lab
+> workspace when you reach exercise 5.4. Begin with its app, requirements,
+> Dockerfile, and `.dockerignore`; later chapters extend the same project.
+
 ---
 
 ## Exercise 5.1 — Container lifecycle drill

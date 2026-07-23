@@ -263,11 +263,39 @@ module "web" {
 Each environment directory has its **own state** — a prod apply cannot touch
 dev, and blast radii stay separated. This layout (modules + per-env roots +
 per-env state) is the industry-standard shape; the alternative spelling is
-**workspaces** (one config, `terraform workspace select prod`) — simpler,
-weaker isolation; fine for small setups.
+**workspaces** — one config, N parallel states:
+
+```bash
+terraform workspace new staging     # create + switch (its state starts empty)
+terraform workspace select prod     # switch; the next plan/apply hits prod's state
+terraform workspace show            # which one am I in — check before any apply!
+```
+
+> **How workspaces work:** every workspace gets its own state file under the same backend (locally: `terraform.tfstate.d/<name>/`), and the config can branch on the built-in `terraform.workspace` value (e.g. `name = "web-${terraform.workspace}"`). Simpler than per-env directories — but *everything else* is shared: same code checkout, same backend, same credentials. "I applied to prod thinking I was in staging" is one forgotten `select` away; directories make the environment visible in your prompt and your PR diff, workspaces hide it in state. Fine for small setups; teams usually graduate to directories.
 
 Public registry modules (registry.terraform.io) are the Helm-charts of infra:
 `terraform-aws-modules/vpc/aws` instead of hand-rolling 40 VPC resources.
+
+### Provisioners — the escape hatch you'll mostly avoid
+
+```hcl
+resource "docker_container" "web" {
+  # ...
+  provisioner "local-exec" {
+    command = "echo '${self.name} is up' >> deploy.log"
+  }
+}
+```
+
+`local-exec` runs a command on *your* machine after the resource is created;
+`remote-exec` SSHes into the resource and runs commands there. They exist and
+you'll meet them in older codebases — but HashiCorp's own docs label them a
+**last resort**: they are imperative scripts hiding inside a declarative tool.
+Nothing they do is recorded in state, they aren't idempotent unless you make
+them so, and a failed provisioner marks the whole resource *tainted* (destroyed
+and recreated on the next apply). The right tools for "now configure what's
+inside": cloud-init/`user_data` at boot, pre-baked images (Packer), or
+Ansible — which is exactly where ch 14 picks up.
 
 ## 6. Terraform in CI — the pipeline pattern
 
@@ -300,5 +328,17 @@ Atlantis (PR-driven applies), Terraform Cloud, Spacelift.
 - developer.hashicorp.com/terraform — "Get Started" + the Docker provider docs
   (registry.terraform.io/providers/kreuzwerker/docker).
 - *Terraform: Up & Running* (Brikman) — the book, especially state & modules chapters.
+
+## Abbreviations
+
+| Abbreviation | Stands for | In a nutshell |
+|---|---|---|
+| IaC | Infrastructure as Code | Declaring infrastructure in versioned files instead of manual steps |
+| HCL | HashiCorp Configuration Language | The declarative syntax Terraform `.tf` files are written in |
+| VPC | Virtual Private Cloud | An isolated private network inside a cloud account |
+| GCS | Google Cloud Storage | A common remote-backend choice for storing Terraform state |
+| RDS | (Amazon) Relational Database Service | AWS's managed database offering, used as an example resource |
+| CI | Continuous Integration | Where `plan`/`apply` get automated and reviewed as pipeline steps |
+| PR | Pull Request | Where a posted `plan` diff gets human review before `apply` |
 
 **Next:** [Exercises](exercises.md) → [Test](test.md) → [Chapter 14: Ansible](../14-ansible/lesson.md)

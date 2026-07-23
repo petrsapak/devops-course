@@ -5,6 +5,10 @@ Work in `~/devops/ch11`. Use your published visits image from ch 07
 (`ghcr.io/<you>/<repo>:latest` — make the package public for easy pulls) or any
 public image (`nginx:1.27`, `traefik/whoami`) where noted.
 
+The [visits-platform lab](../labs/visits-platform/README.md) supplies the image
+source and a production-shaped manifest. Write the early manifests yourself;
+use `k8s/platform.yaml` later as a comparison and debugging fixture.
+
 ---
 
 ## Exercise 11.1 — Cluster orientation

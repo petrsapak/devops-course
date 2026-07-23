@@ -315,4 +315,15 @@ Service (selector: app=visits) ──routes to───┘
 - kubernetes.io/docs/concepts/ — Workloads and Services sections.
 - `kubectl explain` — genuinely a primary doc source.
 
+## Abbreviations
+
+| Abbreviation | Stands for | In a nutshell |
+|---|---|---|
+| K8s | Kubernetes | The container-orchestration platform ("8" replaces the 8 letters between K and s) |
+| RBAC | Role-Based Access Control | Permission model governing who/what can act on cluster objects |
+| DNS | Domain Name System | How Services get stable, name-based addresses inside the cluster |
+| API | Application Programming Interface | Everything — `kubectl` included — talks to the cluster through the API server |
+| CLI | Command-Line Interface | `kubectl`, the cluster's command-line tool |
+| IP | Internet Protocol (address) | What each Pod and Service gets — Pods' IPs are ephemeral, Services' aren't |
+
 **Next:** [Exercises](exercises.md) → [Test](test.md) → [Chapter 12: Kubernetes in Practice](../12-kubernetes-in-practice/lesson.md)

@@ -1,0 +1,13 @@
+image:
+  tag: staging
+
+api:
+  replicas: 1
+
+ingress:
+  enabled: true
+  host: visits.staging.local
+
+autoscaling:
+  minReplicas: 1
+  maxReplicas: 3

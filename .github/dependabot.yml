@@ -1,0 +1,30 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: pip
+    directory: /labs/visits-platform
+    schedule:
+      interval: weekly
+    groups:
+      python-lab:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /labs/visits-platform
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: terraform
+    directory: /labs/visits-platform/infra/terraform
+    schedule:
+      interval: weekly
+    groups:
+      terraform-providers:
+        patterns: ["*"]

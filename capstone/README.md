@@ -61,7 +61,7 @@ DevOps platform around it — entirely on your machine (plus free GitHub).
       is the sanctioned shortcut — installing it via Helm *is* the exercise).
 - [ ] One Grafana dashboard per service: RED top row, resources below, deploy
       annotations (bonus: CI posts them).
-- [ ] Loki + promtail; JSON logs queryable.
+- [ ] Loki + Grafana Alloy; JSON logs queryable.
 - [ ] Alerts: HighErrorRate (page) + TargetDown (warn) routed through
       Alertmanager; every alert has a runbook in the repo (`runbooks/`).
 - [ ] A written SLO (availability + latency) with PromQL SLIs and a budget
@@ -79,7 +79,7 @@ Run and document, with screenshots/logs in `docs/`:
       in docs.
 - [ ] **A flag kill-switch**: enable `FEATURE_STATS` in prod values, then kill
       it via config-only change. Measure the time from decision to effect.
-- [ ] **A game day**: one injected failure (DB down / pod OOM / dead promtail),
+- [ ] **A game day**: one injected failure (DB down / pod OOM / dead Alloy),
       full incident response, and a blameless post-mortem in
       `docs/postmortem-001.md` with at least one shipped action item.
 

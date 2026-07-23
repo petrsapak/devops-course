@@ -201,4 +201,19 @@ the DevOps instinct you're building.
 - *Accelerate* (Forsgren, Humble, Kim) — the research behind DORA metrics.
 - Google's annual *State of DevOps* report.
 
+## Abbreviations
+
+| Abbreviation | Stands for | In a nutshell |
+|---|---|---|
+| DevOps | Development + Operations | Culture/practice merging dev and ops so change ships small, frequent, and low-risk |
+| CALMS | Culture, Automation, Lean, Measurement, Sharing | Five-pillar diagnostic for whether an org is actually "doing DevOps" |
+| DORA | DevOps Research and Assessment | Research group (now part of Google) behind the four key delivery metrics |
+| MTTR | Mean Time To Restore | Average time from incident start to service recovery |
+| CI | Continuous Integration | Every change merged to mainline frequently and auto-built/tested |
+| CD | Continuous Delivery / Deployment | Every passing change is releasable at a button-push (Delivery) or ships automatically (Deployment) |
+| IaC | Infrastructure as Code | Infrastructure defined in versioned files instead of manual setup |
+| SLO | Service Level Objective | The reliability target a team commits to (e.g. 99.9% uptime) |
+| PR | Pull Request | Proposed code change submitted for review before merging |
+| JAR | Java ARchive | Java's packaged, versioned build artifact format |
+
 **Next:** [Exercises](exercises.md) → [Test](test.md) → [Chapter 02: Linux & Shell](../02-linux-and-shell/lesson.md)

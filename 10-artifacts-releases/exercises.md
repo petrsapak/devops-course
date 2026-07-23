@@ -3,6 +3,10 @@
 Mix of hands-on (Docker/nginx from earlier chapters) and design drills. Work in
 `~/devops/ch10`.
 
+Use the [visits-platform lab](../labs/visits-platform/README.md) as the artifact
+you version and promote. Its `APP_VERSION` response makes it possible to prove
+which immutable build is running.
+
 ---
 
 ## Exercise 10.1 — SemVer judgment calls

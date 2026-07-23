@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "visits.fullname" . }}
+  labels:
+    {{- include "visits.labels" . | nindent 4 }}
+data:
+  APP_VERSION: {{ .Chart.AppVersion | quote }}
+  DB_HOST: {{ .Values.database.host | quote }}
+  FEATURE_STATS: {{ .Values.featureStats | quote }}
+  POSTGRES_DB: {{ .Values.database.name | quote }}
+  POSTGRES_USER: {{ .Values.database.user | quote }}
+  WORKER_INTERVAL_SECONDS: {{ .Values.worker.intervalSeconds | quote }}

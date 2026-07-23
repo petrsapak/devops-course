@@ -4,6 +4,11 @@ You need a GitHub account and a repo. Reuse `devops-playground` from ch 03 or
 create `devops-ci-lab`. Put the ch 05/06 Flask "visits" app in it (app.py,
 requirements.txt, Dockerfile, plus a tests folder below).
 
+You may copy the runnable
+[visits-platform lab](../labs/visits-platform/README.md); its
+`.github/workflows` directory is a reference implementation. Create your own
+workflow before comparing it with the reference.
+
 Add a minimal test suite `test_app.py`:
 
 ```python
@@ -124,6 +129,19 @@ failing log, and write down the diagnosis *before* fixing:
 
 **Verify:** your written diagnoses match the "common beginner failures" table in
 the lesson — you recognized each from the log alone.
+
+## Exercise 7.10 — Extract a reusable workflow
+
+1. Move the Python setup, dependency installation, and test steps into
+   `.github/workflows/reusable-python.yml` triggered by `workflow_call`.
+2. Add a typed string input named `python-version` with default `3.12`.
+3. Replace the original test job with a caller job using `uses:` and `with:`.
+4. Add a matrix in the caller for Python 3.11, 3.12, and 3.13.
+5. Call the reusable workflow from a second throwaway workflow to prove it is
+   not coupled to one trigger.
+
+**Verify:** both callers run the shared job, the three matrix versions are
+visible, and changing one test step in the reusable file changes both callers.
 
 ---
 

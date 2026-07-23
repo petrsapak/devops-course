@@ -1,0 +1,36 @@
+groups:
+  - name: visits-recording
+    interval: 30s
+    rules:
+      - record: job:http_requests:rate5m
+        expr: sum by (job) (rate(app_requests_total[5m]))
+      - record: job:http_errors:ratio5m
+        expr: |
+          sum by (job) (rate(app_requests_total{status=~"5.."}[5m]))
+          /
+          clamp_min(sum by (job) (rate(app_requests_total[5m])), 0.001)
+      - record: job:http_request_duration_seconds:p95_5m
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (job, le) (rate(app_request_seconds_bucket[5m]))
+          )
+
+  - name: visits-alerts
+    rules:
+      - alert: HighErrorRate
+        expr: job:http_errors:ratio5m{job="visits-api"} > 0.02
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: Visits API error ratio exceeds 2%
+          runbook_url: docs/runbooks/high-error-rate.md
+      - alert: TargetDown
+        expr: up{job=~"visits-api|visits-worker"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.job }} target is down"
+          runbook_url: docs/runbooks/target-down.md

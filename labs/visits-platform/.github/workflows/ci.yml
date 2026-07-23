@@ -1,0 +1,42 @@
+name: Visits CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  python:
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ["3.11", "3.12", "3.13"]
+    uses: ./.github/workflows/reusable-python.yml
+    with:
+      python-version: ${{ matrix.version }}
+
+  image:
+    needs: python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build both deployables
+        run: |
+          docker build --target api \
+            --tag visits-api:${{ github.sha }} .
+          docker build --target worker \
+            --tag visits-worker:${{ github.sha }} .
+      - name: Smoke-test the image
+        run: |
+          docker run --detach --name visits-smoke \
+            --publish 127.0.0.1:8000:8000 visits-api:${{ github.sha }}
+          for attempt in {1..20}; do
+            curl --fail http://127.0.0.1:8000/health && exit 0
+            sleep 1
+          done
+          docker logs visits-smoke
+          exit 1

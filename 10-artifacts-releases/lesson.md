@@ -40,7 +40,20 @@ Two healthy patterns (often combined, as in ch 07):
 (semantic-release, release-please) scan commits since the last release —
 `fix:` → patch bump, `feat:` → minor, `feat!:`/`BREAKING CHANGE:` → major — then
 tag, generate the changelog, and publish. Version arithmetic stops being a
-meeting.
+meeting. What a run looks like (semantic-release in a CI job after merges land
+on main):
+
+```
+[semantic-release] › ℹ  Found git tag v2.4.1 associated with version 2.4.1
+[semantic-release] › ℹ  Analyzing 9 commits since v2.4.1
+[semantic-release] › ℹ  The commit "fix: retry payment client on 429" → patch
+[semantic-release] › ℹ  The commit "feat: add CSV export" → minor
+[semantic-release] › ℹ  The next release version is 2.5.0
+[semantic-release] › ✔  Created tag v2.5.0
+[semantic-release] › ✔  Published release notes for v2.5.0
+```
+
+> **What just happened:** nobody chose "2.5.0" — the commit *types* did (the highest-ranked change since the last tag wins: the `feat` makes it minor, outranking the `fix`'s patch). The pushed tag then triggers the ch 07 release pipeline exactly as a hand-made tag would. The discipline this buys is that versions always mean what SemVer promises; the discipline it *requires* is honest commit messages — which is why Conventional Commits (ch 03) is enforced with a `commit-msg` hook or CI check wherever this automation runs.
 
 ### 1.3 The iron rule: released versions are immutable
 
@@ -227,5 +240,15 @@ Hand-curate only the headline ("what should a human care about").
 - semver.org — the spec, short and worth reading verbatim.
 - *Release It!* (Nygard) — deployment patterns and production failure modes.
 - martinfowler.com: "BlueGreenDeployment", "CanaryRelease", "Feature Toggles".
+
+## Abbreviations
+
+| Abbreviation | Stands for | In a nutshell |
+|---|---|---|
+| SemVer | Semantic Versioning | The MAJOR.MINOR.PATCH scheme signaling what kind of change shipped |
+| JAR | Java ARchive | Java's packaged build artifact format |
+| OCI | Open Container Initiative | The standard spec container images and runtimes conform to |
+| DIY | Do It Yourself | A config-table feature-flag setup built in-house instead of bought |
+| CSV | Comma-Separated Values | Plain-text spreadsheet format (appears in the example commit message) |
 
 **Next:** [Exercises](exercises.md) → [Test](test.md) → [Chapter 11: Kubernetes Fundamentals](../11-kubernetes-fundamentals/lesson.md)

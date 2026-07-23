@@ -1,0 +1,41 @@
+stages:
+  - test
+  - build
+
+default:
+  interruptible: true
+
+python:
+  stage: test
+  image: python:3.12-slim
+  cache:
+    key:
+      files:
+        - requirements-dev.txt
+    paths:
+      - .cache/pip
+  variables:
+    PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  script:
+    - python -m pip install --requirement requirements-dev.txt
+    - pytest --junitxml=report.xml
+  artifacts:
+    when: always
+    reports:
+      junit: report.xml
+
+image:
+  stage: build
+  image: docker:27-cli
+  services:
+    - name: docker:27-dind
+      alias: docker
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+  needs: [python]
+  script:
+    - docker build --target api --tag "$CI_REGISTRY_IMAGE/api:sha-$CI_COMMIT_SHORT_SHA" .
+    - docker build --target worker --tag "$CI_REGISTRY_IMAGE/worker:sha-$CI_COMMIT_SHORT_SHA" .
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'

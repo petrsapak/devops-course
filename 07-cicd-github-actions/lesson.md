@@ -42,7 +42,7 @@ Actions terminology:
 | **Job** | a set of steps on one fresh **runner** VM; jobs run in parallel unless `needs` says otherwise |
 | **Step** | a shell command (`run:`) or a reusable **action** (`uses:`) |
 | **Runner** | the machine: GitHub-hosted (`ubuntu-latest`) or self-hosted |
-| **Action** | packaged reusable step from the marketplace (`actions/checkout@v4`) |
+| **Action** | packaged reusable step from the marketplace (`actions/checkout@v7`) |
 
 ### Minimal real workflow
 
@@ -60,8 +60,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4          # you must check out your own code!
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7          # you must check out your own code!
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip                        # built-in dependency caching
@@ -73,8 +73,8 @@ jobs:
 > **Line by line:**
 > - `on:` — the trigger block: run on pushes to `main` and on every pull request (a bare `pull_request:` means "any PR event"). These two triggers together = "validate everything before and after merge".
 > - `runs-on: ubuntu-latest` — GitHub boots a fresh Ubuntu VM for this job. Fresh = empty: no code, no Python packages, nothing from previous runs.
-> - `uses: actions/checkout@v4` — an *action* (prepackaged step from the marketplace; `actions/` is GitHub's own namespace, `@v4` pins the major version). Checkout clones your repo into the workspace — the fresh VM doesn't even have your code until this runs.
-> - `uses: actions/setup-python@v5` + `with:` — installs the Python version you declare (`with:` passes parameters to an action); `cache: pip` transparently caches downloaded packages between runs, keyed on your requirements file.
+> - `uses: actions/checkout@v7` — an *action* (prepackaged step from the marketplace; `actions/` is GitHub's own namespace, `@v7` pins the major version). Checkout clones your repo into the workspace — the fresh VM doesn't even have your code until this runs.
+> - `uses: actions/setup-python@v7` + `with:` — installs the Python version you declare (`with:` passes parameters to an action); `cache: pip` transparently caches downloaded packages between runs, keyed on your requirements file.
 > - `run: ...` — plain shell commands (bash on Linux runners): install dependencies, run `ruff` (a fast Python linter), run `pytest` (the test runner; `-v` lists each test by name). Each step's exit code decides pass/fail — ch 02's exit-code convention is the entire foundation of CI.
 > **Expect:** in the repo's *Actions* tab, a run per push with each step's live log; any non-zero exit turns the step red, fails the job, and marks the commit/PR with an ✗. That X, combined with
 branch protection (ch 03), is CI as a *law*.
@@ -83,7 +83,7 @@ Anatomy notes:
 
 - Each job gets a **fresh VM** — nothing survives between jobs except what you
   explicitly pass (artifacts) or cache.
-- `uses: actions/checkout@v4` — pin actions to at least a major version; for
+- `uses: actions/checkout@v7` — pin actions to at least a major version; for
   hard supply-chain rigor, pin to a commit SHA (ch 16).
 - Steps share the job's filesystem and run sequentially; the first failing step
   fails the job.
@@ -108,8 +108,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with: { python-version: "3.12", cache: pip }
       - run: pip install -r requirements.txt
       - run: pytest -v
@@ -121,7 +121,7 @@ jobs:
       contents: read
       packages: write               # allow pushing to ghcr.io
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: docker/setup-buildx-action@v3
 
@@ -227,8 +227,8 @@ This is how "Continuous Delivery with a human button" is spelled in Actions.
       matrix:
         python: ["3.11", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with: { python-version: "${{ matrix.python }}" }
       - run: pip install -r requirements.txt && pytest
 ```
@@ -281,6 +281,48 @@ on:
     - cron: "0 3 * * *"     # nightly: long tests, dependency scans
 ```
 
+### Reusable workflows — don't copy-paste pipelines
+
+When ten repos need the same build-scan-push pipeline, copying the YAML ten
+times means fixing every bug ten times. A workflow with `on: workflow_call`
+becomes callable from other workflows — a function, with typed inputs and
+explicitly passed secrets:
+
+```yaml
+# ci-templates repo: .github/workflows/build-image.yml
+on:
+  workflow_call:
+    inputs:
+      image-name: { required: true, type: string }
+    secrets:
+      registry-token: { required: true }
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # ...the §3 build/scan/push steps, parameterized by ${{ inputs.image-name }}
+```
+
+```yaml
+# any consumer repo: .github/workflows/ci.yml
+jobs:
+  build:
+    uses: your-org/ci-templates/.github/workflows/build-image.yml@v1
+    with:
+      image-name: myapp
+    secrets:
+      registry-token: ${{ secrets.GHCR_TOKEN }}
+```
+
+> **How it works:** the *caller* declares a whole job as `uses: <repo>/<path>@<ref>` — no `steps:` of its own; the called workflow's jobs run as if they were the caller's. `inputs:` are typed and validated at trigger time; `secrets:` must be handed over explicitly (`secrets: inherit` forwards them all — convenient, less auditable). Pin the `@ref` like any dependency: a tag for convenience, a commit SHA for supply-chain rigor (ch 16).
+> **The org pattern:** a platform team owns the `ci-templates` repo; product repos' workflows shrink to ~10 lines of `uses:` + parameters. This is GitHub's answer to Jenkins shared libraries (ch 08) and GitLab `include:` templates (ch 09) — the same idea, which you're about to meet in all three spellings.
+
+The small-scale sibling: a **composite action** (a folder with an `action.yml`
+bundling several `run:`/`uses:` steps) packages *steps* rather than *jobs* —
+right-sized for "our standard lint+format check" reused inside many jobs.
+
 ## 6. Debugging failing workflows — the practical skill
 
 1. **Read the log of the first failing step** — not the last message; scroll to
@@ -315,7 +357,7 @@ You will meet Jenkins and GitLab CI next. The mapping to remember:
 | Unit of parallelism | job | stage/parallel | job |
 | Ordering | `needs:` | `stages { }` order | `stages:` + `needs:` |
 | Executor | runner | agent/node | runner |
-| Reusable pieces | actions | shared libraries | includes/templates |
+| Reusable pieces | reusable workflows, composite actions | shared libraries | includes/templates |
 | Manual gate | environment reviewers | `input` step | `when: manual` |
 
 Learn the concepts once; the rest is syntax.
@@ -324,5 +366,17 @@ Learn the concepts once; the rest is syntax.
 
 - docs.github.com/actions — "Understanding GitHub Actions", workflow syntax reference.
 - docker/build-push-action and docker/metadata-action READMEs.
+
+## Abbreviations
+
+| Abbreviation | Stands for | In a nutshell |
+|---|---|---|
+| CI/CD | Continuous Integration / Continuous Delivery-Deployment | The automated build-test-publish-deploy pipeline this chapter builds |
+| VM | Virtual Machine | The fresh runner machine GitHub boots for each job |
+| YAML | YAML Ain't Markup Language | The format workflow files (`.github/workflows/*.yml`) are written in |
+| SHA | Secure Hash Algorithm (digest) | The commit hash used to tag traceable build images |
+| PR | Pull Request | The event that triggers build+scan-but-not-publish jobs |
+| UI | User Interface | Here, the repo's *Actions* tab where run logs appear |
+| GHCR | GitHub Container Registry | GitHub's built-in Docker registry (`ghcr.io`), where the pipeline pushes images |
 
 **Next:** [Exercises](exercises.md) → [Test](test.md) → [Chapter 08: Jenkins](../08-jenkins/lesson.md)

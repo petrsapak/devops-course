@@ -10,8 +10,8 @@ two things a target host must have?
 **Q2.** Push vs pull configuration management: which is Ansible, and name one
 advantage of each model.
 
-**Q3.** Terraform vs Ansible: state the division of labor in one sentence, and
-give an example task squarely in each tool's lane.
+**Q3.** Terraform vs Ansible: state the division of labor, give one task in each
+tool's lane, and describe the concrete handoff between them.
 
 **Q4.** What does `ansible all -m ping` actually test (it's not ICMP)?
 
@@ -64,7 +64,10 @@ them, where does the config live?
    without a central runner reaching every node.
 3. Terraform provisions infrastructure into existence; Ansible configures the
    inside of what exists. TF lane: create a VM/network/DNS record. Ansible
-   lane: install packages, place config files, manage services/users on that VM.
+   lane: install packages, place config files, manage services/users. The
+   handoff is Terraform outputs rendered into an inventory (for example with
+   `local_file` + `templatefile`), followed by
+   `ansible-playbook -i inventory.ini site.yml`.
 4. SSH connectivity + authentication + a usable Python on the target (module
    round-trip) — i.e., "can Ansible manage this host", not "does it answer ICMP".
 5. `ok`: state already correct, nothing done. `changed`: action taken to reach

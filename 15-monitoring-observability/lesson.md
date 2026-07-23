@@ -135,6 +135,28 @@ The pattern to internalize: **counters are always wrapped in `rate()`** — the
 raw total is meaningless; the per-second rate is the signal. And prefer ratios
 to absolutes (5 errors/s is terrible at 10 req/s, noise at 10k req/s).
 
+### Recording rules — precompute the expensive queries
+
+That `histogram_quantile` expression is too costly to re-evaluate on every
+dashboard refresh and every alert-rule check. **Recording rules** run a query
+on a schedule and save the result as a new, cheap series:
+
+```yaml
+# rules.yml (loaded via rule_files: in prometheus.yml)
+groups:
+  - name: visits-recording
+    interval: 30s
+    rules:
+      - record: job:app_error_ratio:rate5m
+        expr: |
+          sum(rate(app_requests_total{status=~"5.."}[5m]))
+            / sum(rate(app_requests_total[5m]))
+      - record: job:app_latency_p99:rate5m
+        expr: histogram_quantile(0.99, sum(rate(app_request_seconds_bucket[5m])) by (le))
+```
+
+> **How to read it:** each rule evaluates `expr` every `interval` and stores the result under the name in `record:`. The odd-looking name is the naming convention `level:metric:operations` — `job:app_error_ratio:rate5m` = "aggregated to job level, the error ratio, computed as a 5-minute rate". Dashboards and alert rules then query the *recorded* series (`job:app_error_ratio:rate5m > 0.02`): instant reads, and — at least as important — **one shared definition of "error ratio"** instead of five subtly different copies pasted across panels and alerts.
+
 ## 3. What to measure: RED and USE
 
 Two checklists that turn "what should the dashboard show?" from art to procedure:
@@ -198,8 +220,10 @@ sum(rate({job="visits"} | json | level="error" [5m]))   # logs → metrics!
 > - `| json` — parse each line as JSON, turning its fields into queryable labels; `| level="error"` then filters on a parsed field. Substring-match vs field-match is the structured-logging payoff from §5 made tangible: no more matching the word "error" inside a URL by accident.
 > - `sum(rate(... [5m]))` — PromQL-style functions over log streams: errors *per second*, graphable and alertable. You've turned logs into a metric without instrumenting anything — the trick for code you can't modify.
 
-Collection: **Promtail**/**Alloy** agent tails container stdout and ships to
-Loki (in K8s: a DaemonSet — one collector pod per node reads all pod logs).
+Collection: **Grafana Alloy** tails container stdout and ships it to Loki (in
+K8s: a DaemonSet — one collector pod per node reads all pod logs). Older
+examples use Promtail, but it reached end of life in March 2026 and was removed
+from Loki; use Alloy for new work.
 The heavyweight alternative you'll meet in enterprises: **ELK/EFK**
 (Elasticsearch + Logstash/Fluentd + Kibana) — full-text indexing, more power,
 much more cost/ops.
@@ -235,6 +259,32 @@ groups:
 **Alertmanager** (routing layer): groups related alerts, routes by severity
 (page → PagerDuty/phone; warn → Slack), silences during maintenance, inhibits
 downstream noise ("node down" suppresses that node's 30 container alerts).
+Its config makes those words concrete:
+
+```yaml
+# alertmanager.yml
+route:
+  receiver: slack-warnings            # default destination
+  group_by: [alertname, service]      # bundle related firings into one notification
+  routes:
+    - matchers: [severity = "page"]
+      receiver: pagerduty             # only severity=page reaches a phone
+
+receivers:
+  - name: slack-warnings
+    slack_configs:
+      - channel: "#alerts"
+  - name: pagerduty
+    pagerduty_configs:
+      - routing_key: <secret-from-pagerduty>
+
+inhibit_rules:
+  - source_matchers: [alertname = "NodeDown"]
+    target_matchers: [severity = "warning"]
+    equal: [instance]                 # same instance → suppress the small alerts
+```
+
+> **Field by field:** `route` is a decision tree walked top-down — an alert's labels are tested against the child `routes:`, falling through to the default `receiver` when nothing matches. This is where the alert rule's `severity: page` label becomes pager-vs-Slack reality — the label was *routing metadata* all along · `group_by` batches alerts sharing those label values into one notification: 30 pods failing = one message listing 30, not 30 pages · `receivers` are named delivery endpoints (Slack, PagerDuty, email, generic webhook) · `inhibit_rules` encode "the big alert silences its consequences": while `NodeDown` fires for an instance, warnings from that same `instance` (the `equal:` join key) are suppressed — the responder sees the cause, not the 30 symptoms.
 
 Every alert carries a **runbook link** — 3 a.m. responders execute checklists,
 not epiphanies.
@@ -252,12 +302,12 @@ not epiphanies.
 ## 7. The lab stack (exercises build this)
 
 One compose file: visits app (instrumented) + Prometheus + Grafana + Loki +
-Promtail + node-exporter — a complete observability stack on your laptop,
+Alloy + node-exporter — a complete observability stack on your laptop,
 the same architecture (minus scale) as production setups.
 
 ```
 app /metrics ──scrape── Prometheus ──datasource── Grafana ──also── Loki
-app stdout ───tail───── Promtail ──push── Loki          Alertmanager ← rules
+app stdout ───tail───── Alloy ─────push── Loki          Alertmanager ← rules
 ```
 
 ## Further reading
@@ -266,5 +316,16 @@ app stdout ───tail───── Promtail ──push── Loki          
 - Google SRE book (sre.google/books, free): "Monitoring Distributed Systems",
   "Alerting on SLOs".
 - grafana.com/docs — Loki "Getting started".
+
+## Abbreviations
+
+| Abbreviation | Stands for | In a nutshell |
+|---|---|---|
+| SLI | Service Level Indicator | The measured signal, e.g. "% of requests <300ms and non-5xx" |
+| SLO | Service Level Objective | The target for that indicator, e.g. "99.9% over 30 days" |
+| RED | Rate, Errors, Duration | Checklist for what to dashboard on a request-driven service |
+| USE | Utilization, Saturation, Errors | Checklist for what to dashboard on a resource (CPU, disk, queue) |
+| PII | Personally Identifiable Information | Data that must never be written to logs |
+| ELK / EFK | Elasticsearch + Logstash/Fluentd + Kibana | The heavyweight full-text log stack, alternative to Loki |
 
 **Next:** [Exercises](exercises.md) → [Test](test.md) → [Chapter 16: DevSecOps & SRE](../16-devsecops-sre/lesson.md)

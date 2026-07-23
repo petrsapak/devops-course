@@ -543,4 +543,27 @@ Decoding the non-obvious rows:
 - `curl -LO <url>` — `-L` follow redirects (GitHub releases redirect to a CDN — without `-L` you download an HTML stub), `-O` save under the remote filename.
 - `diff -u a b` — compare files; `-u` unified format (the `+++`/`---`/`@@` style you know from `git diff` — this is where that format comes from).
 
+## Abbreviations
+
+| Abbreviation | Stands for | In a nutshell |
+|---|---|---|
+| WSL2 | Windows Subsystem for Linux (version 2) | Runs a real Linux kernel alongside Windows — the course's dev environment |
+| CLI | Command-Line Interface | A text-based way to control a program, as opposed to a GUI |
+| VM | Virtual Machine | A fully emulated computer with its own kernel — heavier than a container |
+| PID | Process ID | The unique number the kernel assigns to each running process |
+| CPU | Central Processing Unit | The processor; `%CPU` columns show how busy it is |
+| RAM | Random-Access Memory | Working memory; `free -h` reports how much is available |
+| ENV | Environment (variable) | A key/value pair passed into a process's runtime context |
+| API | Application Programming Interface | A system's callable interface — what `curl`/`jq` usually talk to |
+| JSON | JavaScript Object Notation | The data format modern APIs speak; `jq` is its query tool |
+| HTTP | HyperText Transfer Protocol | The protocol behind web requests and most APIs |
+| DNS | Domain Name System | Resolves human-readable names to IP addresses |
+| IP | Internet Protocol (address) | A device's network address |
+| TCP | Transmission Control Protocol | Reliable, ordered network transport (what SSH/HTTP ride on) |
+| URL | Uniform Resource Locator | A web address |
+| SSH | Secure Shell | Encrypted remote login and command execution |
+| ASCII | American Standard Code for Information Interchange | Plain-text encoding; what `file` reports for text files |
+| ELF | Executable and Linkable Format | Linux's binary executable file format |
+| CDN | Content Delivery Network | Distributed cache serving static content close to users |
+
 **Next:** [Exercises](exercises.md) → [Test](test.md) → [Chapter 03: Git Workflows](../03-git-workflows/lesson.md)

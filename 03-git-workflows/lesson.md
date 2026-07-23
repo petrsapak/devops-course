@@ -148,17 +148,37 @@ git rebase -i main
 
 Typical use: squash five "wip" commits into one meaningful commit before the PR.
 
-Conflicts happen with both. Resolving:
+Conflicts happen with both. A conflict is not an error — it's Git saying "both
+sides changed the same lines; a human must choose." Inside a conflicted file:
+
+```
+def get_timeout():
+ <<<<<<< HEAD
+    return config.timeout or 30      # your branch's version
+ =======
+    return settings.TIMEOUT          # main's version
+ >>>>>>> main
+```
+
+Between `<<<<<<<` and `=======` is **your side** (`HEAD`); between `=======` and
+`>>>>>>>` is **the side being merged in**. Resolving = editing the block into the
+code you actually want — one side, the other, or a hand-written blend — and
+deleting all three marker lines. There is no magic: the markers are plain text
+in the file, and the resolution is an edit like any other.
 
 ```bash
 # after a conflicted merge/rebase:
-git status                 # lists conflicted files
-# edit files: pick between <<<<<<< ======= >>>>>>> sections
-git add <resolved-files>
+git status                 # conflicted files listed under "Unmerged paths"
+git diff                   # shows the conflicted hunks with both sides
+# edit files, resolve each <<<<<<< block, then:
+git add <resolved-files>   # marks them resolved
 git merge --continue       # or: git rebase --continue
-# bail out entirely:
+# bail out entirely, back to the pre-merge state:
 git merge --abort          # or: git rebase --abort
 ```
+
+> **The flow decoded:** `git add` on a conflicted file means "I declare this resolved" — staging doubles as the resolution ledger. `--continue` then finishes the merge commit (or moves the rebase on to the next commit — a rebase can conflict repeatedly, once per replayed commit). `--abort` is the no-shame escape hatch: everything back exactly as it was before you started.
+> **Shortcuts:** `git checkout --ours <file>` / `--theirs <file>` takes one side wholesale — right for lockfiles and generated files you'd regenerate anyway. **Rebase trap:** during a rebase the meanings invert — `--ours` is the branch you're rebasing *onto*, `--theirs` is your own commits (rebase replays *your* commits onto the other branch, so from Git's seat the base is "ours"). Run `git diff` before trusting either.
 
 ---
 
@@ -246,6 +266,23 @@ git describe --tags                      # nearest tag + distance, e.g. v1.4.0-3
 Use **annotated** tags for releases (lightweight tags are just pointers, no metadata).
 In ch 07 you'll build a pipeline that fires on `v*` tags and publishes an artifact
 whose version = the tag.
+
+### Signed commits and tags — proving who made them
+
+A commit's author field is just text: `git config user.name "Linus Torvalds"`
+and you're "Linus" in every log. Signatures fix that with cryptography — and
+modern Git can sign with the SSH key you already have (ch 02), no GPG setup:
+
+```bash
+git config --global gpg.format ssh
+git config --global user.signingkey ~/.ssh/id_ed25519.pub
+git commit -S -m "Add retry to payment client"
+git tag -s v1.4.0 -m "Release 1.4.0"
+git log --show-signature -1
+```
+
+> **Command by command:** the two `config` lines switch signing from GPG (the historical default) to your **SSH key** and point at the public half · `-S` on commit / `-s` on tag attaches a signature made with the private key · `--show-signature` verifies and displays it in the log. GitHub/GitLab verify signatures server-side and show the **Verified** badge; branch protection can *require* signed commits.
+> **Why it matters here:** this is the provenance chain's first link — ch 16 signs *images* (cosign) for the same reason. Signed commit → reviewed PR → signed image = "everything in prod traces to a person and a pipeline."
 
 ---
 
@@ -342,5 +379,18 @@ Keep this table in mind — it's the skeleton every CI config in this course fle
 - *Pro Git* (free online: git-scm.com/book) — chapters 2, 3, 7.
 - trunkbaseddevelopment.com — the reference site for trunk-based development.
 - conventionalcommits.org
+
+## Abbreviations
+
+| Abbreviation | Stands for | In a nutshell |
+|---|---|---|
+| PR | Pull Request | Proposed change submitted for review before merging into a shared branch |
+| CI/CD | Continuous Integration / Continuous Delivery-Deployment | The automated build-test-release pipeline a Git event triggers |
+| SHA | Secure Hash Algorithm (digest) | The hex ID that uniquely identifies a Git commit's content |
+| WIP | Work In Progress | Marks an unfinished commit or PR not meant for merging yet |
+| PEM | Privacy-Enhanced Mail (format) | The base64 text format used for private keys and certificates |
+| AWS | Amazon Web Services | Cloud provider whose access-key prefix (`AKIA`) the secret-scanning regex looks for |
+| GPG | GNU Privacy Guard | The OpenPGP toolset historically used for signing commits/tags (SSH keys now work too) |
+| SSH | Secure Shell | Encrypted remote access; its key pairs can also sign Git commits |
 
 **Next:** [Exercises](exercises.md) → [Test](test.md) → [Chapter 04: Networking](../04-networking/lesson.md)

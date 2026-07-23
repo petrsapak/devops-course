@@ -2,6 +2,10 @@
 
 Two paths — pick one (or both):
 
+The [visits-platform lab](../labs/visits-platform/README.md) includes a
+`.gitlab-ci.yml` spelling of the same test/build pipeline used in chapter 07.
+Use it as the migration target after attempting the mapping yourself.
+
 - **Path A (recommended, closest to real use):** free account on gitlab.com,
   push the ch 07 app there, use shared runners.
 - **Path B (fully local):** validate pipelines with `gitlab-ci-local`

@@ -177,7 +177,7 @@ if __name__ == "__main__":
 `requirements.txt`:
 
 ```
-flask==3.0.3
+flask==3.1.3
 ```
 
 The Dockerfile:
@@ -342,5 +342,20 @@ container pipeline you'll build for the rest of the course.
 
 - Docker docs: "Docker overview" and Dockerfile reference.
 - `docker run --help` — genuinely, skim it once.
+
+## Abbreviations
+
+| Abbreviation | Stands for | In a nutshell |
+|---|---|---|
+| VM | Virtual Machine | A fully emulated computer with its own kernel — what containers are lighter than |
+| PID | Process ID | The kernel's number for a running process; PID 1 is a container's main process |
+| CPU | Central Processing Unit | The processor; what `cgroups` can cap per container |
+| GB / MB | Gigabyte / Megabyte | Units of image or data size |
+| CLI | Command-Line Interface | The `docker` command itself, talking to the daemon |
+| ENV | Environment (variable) | Dockerfile instruction setting a runtime config variable |
+| ARG | (Build) Argument | Dockerfile instruction for a build-time-only variable |
+| ECR | (Amazon) Elastic Container Registry | AWS's managed Docker registry |
+| ACR | Azure Container Registry | Azure's managed Docker registry |
+| GAR | Google Artifact Registry | Google Cloud's managed Docker registry |
 
 **Next:** [Exercises](exercises.md) → [Test](test.md) → [Chapter 06: Docker in Practice](../06-docker-in-practice/lesson.md)

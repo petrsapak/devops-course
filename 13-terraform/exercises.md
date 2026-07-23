@@ -1,5 +1,9 @@
 # Chapter 13 — Exercises
 
+The [visits-platform infrastructure lab](../labs/visits-platform/README.md)
+contains a complete local Docker-provider configuration. Use it after the core
+exercises to compare state, generated outputs, and module structure.
+
 Install Terraform in WSL2 first:
 
 ```bash

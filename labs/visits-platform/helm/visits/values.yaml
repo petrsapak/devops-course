@@ -1,0 +1,53 @@
+image:
+  apiRepository: ghcr.io/example/visits-api
+  workerRepository: ghcr.io/example/visits-worker
+  tag: replace-me
+  pullPolicy: IfNotPresent
+
+api:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 96Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+worker:
+  replicas: 1
+  intervalSeconds: 30
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 128Mi
+
+database:
+  host: postgres
+  name: visits
+  user: visits
+  existingSecret: visits-db
+  passwordKey: password
+
+featureStats: false
+
+service:
+  port: 80
+
+ingress:
+  enabled: false
+  className: nginx
+  host: visits.local
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+networkPolicy:
+  enabled: true
+  ingressNamespace: ingress-nginx

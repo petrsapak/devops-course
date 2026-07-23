@@ -2,6 +2,11 @@
 
 Work in `~/devops/ch06`.
 
+> **Starter files:** the
+> [visits-platform lab](../labs/visits-platform/README.md) contains the complete
+> Compose version. Build each exercise yourself first, then use the reference
+> to compare networking, secrets, health checks, and hardening choices.
+
 ---
 
 ## Exercise 6.1 — Volume persistence proof
@@ -68,7 +73,7 @@ def visits():
 app.run(host="0.0.0.0", port=8000) if __name__ == "__main__" else None
 ```
 
-(`requirements.txt`: `flask==3.0.3` and `psycopg[binary]==3.2.1`)
+(`requirements.txt`: `flask==3.1.3` and `psycopg[binary]==3.3.4`)
 
 1. `docker compose up -d --build`, then curl `/visits` several times — counter grows.
 2. `docker compose down` (no `-v`), up again — does the counter continue or reset?

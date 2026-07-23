@@ -223,6 +223,16 @@ environments — which is exactly what containers + IaC (ch 11–13) make possib
 This idea (preview deployments) now exists on every platform (Vercel/Netlify
 previews, Argo CD ApplicationSets, Heroku review apps).
 
+### Also GitLab-notable: merge trains
+
+On a busy repo, two MRs can each pass CI against `main` *separately* and still
+break `main` when both land — they were never tested *together*. **Merge
+trains** fix this by queueing merges: each MR in the train runs CI against
+`main` **plus every MR queued ahead of it**; a failure ejects that MR and the
+train re-forms without it. "Test the integrated future state before merging,
+automatically" — the idea GitHub later shipped as *merge queue*. Worth turning
+on at high commit rates; overkill below them.
+
 ## 6. Choosing a CI system — the decision framework
 
 Having now used three, the honest summary:
@@ -243,5 +253,14 @@ three chapters — that's the real lesson.
 
 - docs.gitlab.com/ee/ci/ — `.gitlab-ci.yml` reference and "CI/CD examples".
 - docs.gitlab.com/ee/ci/environments/ — environments & review apps.
+
+## Abbreviations
+
+| Abbreviation | Stands for | In a nutshell |
+|---|---|---|
+| MR | Merge Request | GitLab's name for what GitHub calls a Pull Request |
+| DAG | Directed Acyclic Graph | The dependency graph `needs:` builds between jobs, bypassing stage order |
+| SAST | Static Application Security Testing | Scanning source code for vulnerable patterns without running it |
+| DinD | Docker-in-Docker | Running an actual Docker daemon as a sidecar inside a CI job |
 
 **Next:** [Exercises](exercises.md) → [Test](test.md) → [Chapter 10: Artifacts & Releases](../10-artifacts-releases/lesson.md)

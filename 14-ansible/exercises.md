@@ -1,5 +1,9 @@
 # Chapter 14 — Exercises
 
+The [visits-platform infrastructure lab](../labs/visits-platform/README.md)
+provides Terraform-created SSH nodes, a generated inventory, and an idempotent
+Ansible role. It is the runnable reference for exercise 14.8.
+
 ## Lab setup — a 3-node fleet in Docker
 
 Install Ansible: `sudo apt install -y ansible ansible-lint` (WSL2).

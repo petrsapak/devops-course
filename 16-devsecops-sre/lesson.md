@@ -162,6 +162,21 @@ Ch 15 defined SLI/SLO/budget. The operational contract that makes them real:
 - 100% is not a target: the last nine costs more than users can perceive, and a
   zero-risk posture blocks all change (ch 01's inversion, quantified).
 
+The alerting mechanics (ch 15's toolbox aimed at the budget): alert on **burn
+rate** — the multiple of the budget-spend rate at which you're currently
+consuming the month:
+
+```promql
+# page: error ratio is 14.4× the SLO budget rate
+# (at 14.4×, a 30-day budget is gone in ~2 days — worth waking someone)
+(
+  sum(rate(app_requests_total{status=~"5.."}[1h]))
+    / sum(rate(app_requests_total[1h]))
+) > 14.4 * 0.001
+```
+
+> **The arithmetic:** an SLO of 99.9% means the budget is a 0.1% (= 0.001) error ratio sustained over the whole window. Burn rate = observed ratio ÷ budget ratio: burning at exactly 1× spends the budget in exactly 30 days (fine — that's what it's for); 14.4× spends it in 2 days (page now); a steady 1–2× measured over days is a slow leak — ticket, not page. Production setups pair two windows (a fast ~1h check for pages, a slow 6h/3d check for tickets) — the "multi-window, multi-burn-rate" pattern from Google's SRE Workbook, the canonical reference for this.
+
 ### B2. Toil — the budget for automation
 
 **Toil** = manual, repetitive, automatable, scales-with-load operational work
@@ -232,5 +247,22 @@ Score any team (or interview any employer) against this:
 - Google SRE book + SRE Workbook (sre.google/books — free, canonical).
 - OWASP DevSecOps Guideline; SLSA.dev for supply-chain maturity.
 - *Accelerate* (again — reread it now; it will land differently than in ch 01).
+
+## Abbreviations
+
+| Abbreviation | Stands for | In a nutshell |
+|---|---|---|
+| SCA | Software Composition Analysis | Scanning your dependencies for known vulnerabilities |
+| SAST | Static Application Security Testing | Scanning your own source code for dangerous patterns |
+| DAST | Dynamic Application Security Testing | Probing the *running* app for vulnerabilities |
+| OWASP | Open Web Application Security Project | Nonprofit behind widely-used security guides and checklists |
+| OIDC | OpenID Connect | Identity-federation protocol letting CI mint short-lived cloud credentials without stored keys |
+| SLSA | Supply-chain Levels for Software Artifacts | Maturity framework for supply-chain security practices |
+| SBOM | Software Bill of Materials | A manifest of every component inside a built artifact |
+| SPDX | Software Package Data Exchange | One of the two standard machine-readable SBOM formats (with CycloneDX) |
+| CVE | Common Vulnerabilities and Exposures | Public ID for a known security vulnerability |
+| MFA | Multi-Factor Authentication | Requiring more than a password to log in |
+| TTL | Time To Live | How long a dynamic secret (or cached value) stays valid before expiring |
+| SEV1 / SEV3 | Severity 1 / Severity 3 | Incident severity levels — SEV1 = users down, all hands |
 
 **Next:** [Exercises](exercises.md) → [Test](test.md) → [Capstone](../capstone/README.md)
