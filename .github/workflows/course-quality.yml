@@ -20,7 +20,7 @@ jobs:
         shell: pwsh
         run: ./scripts/Test-Course.ps1
       - name: Lint Markdown
-        uses: DavidAnson/markdownlint-cli2-action@v24.1.0
+        uses: DavidAnson/markdownlint-cli2-action@v24.2.0
 
   lab:
     runs-on: ubuntu-latest
