@@ -6,7 +6,7 @@ metadata:
     {{- include "visits.labels" . | nindent 4 }}
 data:
   APP_VERSION: {{ .Chart.AppVersion | quote }}
-  DB_HOST: {{ .Values.database.host | quote }}
+  DB_HOST: {{ ternary (printf "%s-postgres" (include "visits.fullname" .)) .Values.database.host .Values.database.internal.enabled | quote }}
   FEATURE_STATS: {{ .Values.featureStats | quote }}
   POSTGRES_DB: {{ .Values.database.name | quote }}
   POSTGRES_USER: {{ .Values.database.user | quote }}

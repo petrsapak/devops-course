@@ -18,13 +18,22 @@ spec:
         - protocol: TCP
           port: 8000
   egress:
+    {{- if .Values.database.internal.enabled }}
     - to:
         - podSelector:
             matchLabels:
-              app.kubernetes.io/name: postgres
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: postgres
       ports:
         - protocol: TCP
           port: 5432
+    {{- else }}
+    - to:
+        {{- toYaml .Values.database.externalEgress | nindent 8 }}
+      ports:
+        - protocol: TCP
+          port: 5432
+    {{- end }}
     - to:
         - namespaceSelector:
             matchLabels:

@@ -5,7 +5,14 @@ import uuid
 
 import psycopg
 from flask import Flask, Response, g, jsonify, request
-from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    CollectorRegistry,
+    Counter,
+    Histogram,
+    generate_latest,
+    multiprocess,
+)
 
 from app.config import database_url
 from app.logging_config import configure_logging
@@ -25,6 +32,14 @@ LATENCY = Histogram(
 
 def _feature_enabled(name: str) -> bool:
     return os.getenv(name, "false").lower() in {"1", "true", "yes", "on"}
+
+
+def _metrics_payload() -> bytes:
+    if os.getenv("PROMETHEUS_MULTIPROC_DIR"):
+        registry = CollectorRegistry()
+        multiprocess.MultiProcessCollector(registry)
+        return generate_latest(registry)
+    return generate_latest()
 
 
 def create_app() -> Flask:
@@ -101,7 +116,7 @@ def create_app() -> Flask:
 
     @app.get("/metrics")
     def metrics() -> Response:
-        return Response(generate_latest(), content_type=CONTENT_TYPE_LATEST)
+        return Response(_metrics_payload(), content_type=CONTENT_TYPE_LATEST)
 
     return app
 

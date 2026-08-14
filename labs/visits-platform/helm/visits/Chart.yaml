@@ -1,6 +1,6 @@
 apiVersion: v2
 name: visits
-description: Course lab chart for the visits API and worker
+description: Course lab chart for the visits API, worker, and optional PostgreSQL
 type: application
-version: 0.1.0
+version: 0.2.0
 appVersion: "1.0.0"

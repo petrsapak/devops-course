@@ -27,7 +27,33 @@ pipeline {
 
     stage('Build') {
       steps {
-        sh 'docker build --tag visits-api:${GIT_COMMIT} .'
+        sh 'docker build --target api --tag visits-api:${GIT_COMMIT} .'
+        sh 'docker build --target worker --tag visits-worker:${GIT_COMMIT} .'
+      }
+    }
+
+    stage('Smoke test') {
+      steps {
+        sh '''
+          docker run --detach --name visits-api-smoke-${BUILD_NUMBER} visits-api:${GIT_COMMIT}
+          docker run --detach --name visits-worker-smoke-${BUILD_NUMBER} visits-worker:${GIT_COMMIT}
+          for attempt in $(seq 1 20); do
+            docker exec visits-api-smoke-${BUILD_NUMBER} python -c \
+              "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)" \
+              && docker exec visits-worker-smoke-${BUILD_NUMBER} python -c \
+              "import urllib.request; urllib.request.urlopen('http://localhost:8001/metrics', timeout=2)" \
+              && exit 0
+            sleep 1
+          done
+          docker logs visits-api-smoke-${BUILD_NUMBER}
+          docker logs visits-worker-smoke-${BUILD_NUMBER}
+          exit 1
+        '''
+      }
+      post {
+        always {
+          sh 'docker rm --force visits-api-smoke-${BUILD_NUMBER} visits-worker-smoke-${BUILD_NUMBER} || true'
+        }
       }
     }
   }

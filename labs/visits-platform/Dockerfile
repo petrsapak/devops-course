@@ -23,12 +23,13 @@ COPY --chown=app:app app ./app
 USER 10001:10001
 
 FROM runtime AS api
+ENV PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus
 EXPOSE 8000
 
 HEALTHCHECK --interval=15s --timeout=3s --retries=3 \
   CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]
 
-CMD ["gunicorn", "--bind=0.0.0.0:8000", "--workers=2", "--access-logfile=-", "app.app:app"]
+CMD ["gunicorn", "--config=python:app.gunicorn_config", "--bind=0.0.0.0:8000", "--workers=2", "--access-logfile=-", "app.app:app"]
 
 FROM runtime AS worker
 EXPOSE 8001

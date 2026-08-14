@@ -115,7 +115,7 @@ Run and document, with screenshots/logs in `docs/`:
 - Gaps this course deliberately left for your next steps: a real cloud
   (take the AWS/Azure/GCP flavor of chs 11–13 — concepts transfer 1:1),
   service mesh & mTLS, distributed tracing hands-on (add OpenTelemetry to the
-  two services — you already have the trace_id fields waiting), Kubernetes
+  two services — you already have request IDs to correlate logs), Kubernetes
   operators, platform engineering (Backstage), and the CKA/CKAD certification
   if credentials matter in your market.
 

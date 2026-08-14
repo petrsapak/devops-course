@@ -101,6 +101,7 @@ foreach ($file in $markdownFiles) {
 
 $requiredLabFiles = @(
     "labs/visits-platform/app/app.py",
+    "labs/visits-platform/app/gunicorn_config.py",
     "labs/visits-platform/app/worker.py",
     "labs/visits-platform/compose.yaml",
     "labs/visits-platform/Dockerfile",
@@ -109,6 +110,7 @@ $requiredLabFiles = @(
     "labs/visits-platform/.gitlab-ci.yml",
     "labs/visits-platform/k8s/platform.yaml",
     "labs/visits-platform/helm/visits/Chart.yaml",
+    "labs/visits-platform/helm/visits/values.schema.json",
     "labs/visits-platform/infra/terraform/main.tf",
     "labs/visits-platform/infra/ansible/site.yml",
     "labs/visits-platform/observability/prometheus/rules.yml"

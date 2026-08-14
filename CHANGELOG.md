@@ -22,3 +22,10 @@ release tags rather than promising semantic compatibility for prose.
   topics.
 - Reframed the course as a practical job-ready foundation and adjusted the
   expected time commitment.
+
+### Fixed
+
+- Corrected the Jenkins image targets, PostgreSQL connection escaping, and
+  multiprocess Prometheus metrics in the visits-platform lab.
+- Made the Helm database contract runnable and explicit, expanded application
+  and integration tests, and documented the standalone CI workflow layout.

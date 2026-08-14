@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["database", "image"],
+  "properties": {
+    "database": {
+      "type": "object",
+      "required": ["host", "name", "user", "existingSecret", "passwordKey", "internal", "externalEgress"],
+      "properties": {
+        "host": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "user": { "type": "string", "minLength": 1 },
+        "existingSecret": { "type": "string", "minLength": 1 },
+        "passwordKey": { "type": "string", "minLength": 1 },
+        "internal": {
+          "type": "object",
+          "required": ["enabled", "image", "storage", "resources"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "image": { "type": "string", "minLength": 1 },
+            "storage": { "type": "string", "minLength": 1 },
+            "resources": { "type": "object" }
+          }
+        },
+        "externalEgress": { "type": "array" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "internal": {
+                "properties": { "enabled": { "const": false } }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "externalEgress": { "minItems": 1 }
+            }
+          }
+        }
+      ]
+    },
+    "image": {
+      "type": "object",
+      "required": ["apiRepository", "workerRepository", "tag", "pullPolicy"],
+      "properties": {
+        "apiRepository": { "type": "string", "minLength": 1 },
+        "workerRepository": { "type": "string", "minLength": 1 },
+        "tag": { "type": "string", "minLength": 1 },
+        "pullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] }
+      }
+    }
+  }
+}

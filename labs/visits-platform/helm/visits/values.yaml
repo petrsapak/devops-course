@@ -31,6 +31,18 @@ database:
   user: visits
   existingSecret: visits-db
   passwordKey: password
+  internal:
+    enabled: true
+    image: postgres:16.4-alpine
+    storage: 1Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  externalEgress: []
 
 featureStats: false
 
